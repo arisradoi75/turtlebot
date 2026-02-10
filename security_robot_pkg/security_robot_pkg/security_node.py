@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
+from std_msgs.msg import Bool
 
 class SecurityNode(Node):
     def __init__(self):
@@ -22,6 +23,9 @@ class SecurityNode(Node):
             self.image_callback,
             10  # QoS history depth
         )
+        
+        # Publisher for intruder alerts
+        self.publisher_ = self.create_publisher(Bool, '/intruder_alert', 10)
         
         # Flag to prevent spamming messages for the same detection event
         self.red_object_detected = False
@@ -58,8 +62,20 @@ class SecurityNode(Node):
             if not self.red_object_detected:
                 self.get_logger().warn("SECURITY ALERT: Low Threat - Suspicious red object detected!")
                 self.red_object_detected = True
+            
+            # Publish alert to /intruder_alert
+            msg = Bool()
+            msg.data = True
+            self.publisher_.publish(msg)
+
+            # Pop up window with alert message
+            cv2.putText(cv_image, "INTRUDER ALERT!", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+            cv2.imshow("Security Camera", cv_image)
+            cv2.waitKey(1)
         else:
             self.red_object_detected = False
+            cv2.imshow("Security Camera", cv_image)
+            cv2.waitKey(1)
 
 def main(args=None):
     rclpy.init(args=args)
