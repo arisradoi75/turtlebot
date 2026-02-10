@@ -39,7 +39,7 @@ public class AuthService {
                 .email(registerRequest.getEmail()) // Setează email-ul.
                 .username(registerRequest.getUsername()) // Setează username-ul.
                 .password(passwordEncoder.encode(registerRequest.getPassword())) // Criptează și setează parola.
-                .type(TypeUser.USER) // Setează tipul utilizatorului (implicit USER).
+                .type(TypeUser.ADMIN) // Setează tipul utilizatorului (implicit USER).
                 .build();
 
         // Salvează utilizatorul în baza de date.

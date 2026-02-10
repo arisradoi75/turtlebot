@@ -1,4 +1,4 @@
-package com.example.robot.auth.config; // Atenție la pachet!
+package com.example.robot.auth.config;
 
 import com.example.robot.auth.services.AuthFilterService;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +14,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@RequiredArgsConstructor
-@EnableMethodSecurity
 @EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfiguration {
 
     private final AuthFilterService authFilterService;
@@ -26,17 +26,16 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        // 1. Auth (Login/Register) - PUBLIC
+                .authorizeHttpRequests(req -> req
+                        // Rute Publice
                         .requestMatchers("/api/v1/auth/**").permitAll()
-
-                        // 2. Robot API (Python trimite date) - PUBLIC
                         .requestMatchers("/api/robot/**").permitAll()
-
-                        // 3. WebSocket (Harta Live) - PUBLIC
                         .requestMatchers("/ws-robot/**").permitAll()
 
-                        // 4. Restul - DOAR CU LOGIN
+                        // Rute de Admin - NECESITĂ ROL DE ADMIN
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+
+                        // Orice altceva necesită doar Autentificare
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
