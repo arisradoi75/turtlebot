@@ -6,6 +6,10 @@ import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool
+import json
+import base64
+from datetime import datetime
+import requests
 
 class SecurityNode(Node):
     def __init__(self):
@@ -62,7 +66,34 @@ class SecurityNode(Node):
             if not self.red_object_detected:
                 self.get_logger().warn("SECURITY ALERT: Low Threat - Suspicious red object detected!")
                 self.red_object_detected = True
+                
+                # Encode image to Base64
+                _, buffer = cv2.imencode('.jpg', cv_image)
+                image_base64 = base64.b64encode(buffer).decode('utf-8')
+                
+                alert_data = {
+                    "alertType": "Low Threat",
+                    "message": "I saw something suspicious",
+                    "imageBase64": image_base64,
+                    "timestamp": datetime.now().isoformat(),
+                    "status": "ALERT",
+                }
+                with open("robot_alert.json", "w") as f:
+                    json.dump(alert_data, f)
             
+                # Send alert to Spring Boot application
+                try:
+                    # TODO: Replace 192.168.1.X with your Spring Boot computer's actual IP
+                    url = "http://172.20.10.2:8080/api/robot/alert"
+                    headers = {'Content-Type': 'application/json'}
+                    response = requests.post(url, json=alert_data, headers=headers, timeout=2.0)
+                    if response.status_code == 200:
+                        self.get_logger().info("Alert sent to backend successfully.")
+                    else:
+                        self.get_logger().warn(f"Failed to send alert to backend. Status: {response.status_code}")
+                except requests.exceptions.RequestException as e:
+                    self.get_logger().error(f"Error sending alert to backend: {e}")
+
             # Publish alert to /intruder_alert
             msg = Bool()
             msg.data = True
