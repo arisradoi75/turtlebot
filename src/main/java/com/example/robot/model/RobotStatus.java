@@ -2,7 +2,7 @@ package com.example.robot.model;
 
 public enum RobotStatus {
     PATROLLING,
-    IDLE,
+    ALERT,
     CHARGING,
     DOCKING
 }

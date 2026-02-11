@@ -6,7 +6,6 @@ import lombok.Data;
 public class RobotStatusDTO {
     private double x;
     private double y;
-    private double theta;
     private double batteryLevel;
     private String status;
     private String timestamp;

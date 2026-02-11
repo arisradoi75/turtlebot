@@ -23,10 +23,10 @@ public class Robot {
 
     private double x;
     private double y;
-    private double theta; //directia in care priveste robotul
     private double batteryLevel;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 25)
     private RobotStatus status;
 
     private LocalDateTime timestamp;

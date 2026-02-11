@@ -7,7 +7,7 @@ import org.springframework.web.client.RestTemplate;
 public class CommandService {
     // AICI TREBUIE PUS IP-ul LAPTOPULUI CU LINUX (unde e Robotul)
     // Robotul trebuie să aibă un server Flask pe portul 5000 (ți-am dat codul python anterior)
-    private final String ROBOT_API_URL = "http://192.168.1.XXX:5000/api/command";
+    private final String ROBOT_API_URL = "http://172.20.10.12:5000/api/command";
 
     private final RestTemplate restTemplate = new RestTemplate();
 

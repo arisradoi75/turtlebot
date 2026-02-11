@@ -494,7 +494,6 @@ import lombok.Data;
 public class RobotStatusDTO {
     private double x;
     private double y;
-    private double theta;
     private double batteryLevel;
     private String status;
     private String timestamp;
@@ -564,7 +563,6 @@ public class Robot {
 
     private double x;
     private double y;
-    private double theta; //directia in care priveste robotul
     private double batteryLevel;
 
     @Enumerated(EnumType.STRING)
@@ -666,7 +664,6 @@ import com.example.robot.dto.RobotStatusDTO;
 import com.example.robot.model.Robot;
 import com.example.robot.model.RobotStatus;
 import com.example.robot.repository.RobotRepository;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -685,7 +682,6 @@ public class RobotService {
 
         robot.setX(dto.getX());
         robot.setY(dto.getY());
-        robot.setTheta(dto.getTheta());
         robot.setBatteryLevel(dto.getBatteryLevel());
 
         try {

@@ -22,18 +22,17 @@ public class RobotService {
 
         robot.setX(dto.getX());
         robot.setY(dto.getY());
-        robot.setTheta(dto.getTheta());
         robot.setBatteryLevel(dto.getBatteryLevel());
 
         try {
             if (dto.getStatus() != null) {
                 robot.setStatus(RobotStatus.valueOf(dto.getStatus().toUpperCase()));
             } else {
-                robot.setStatus(RobotStatus.IDLE);
+                robot.setStatus(RobotStatus.ALERT);
             }
         } catch (IllegalArgumentException e) {
             System.err.println("Status necunoscut primit: " + dto.getStatus());
-            robot.setStatus(RobotStatus.IDLE);
+            robot.setStatus(RobotStatus.ALERT);
         }
 
         if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
@@ -51,7 +50,6 @@ public class RobotService {
                     "Bateria robotului este critică (" + robot.getBatteryLevel() + "%) și nu încarcă!");
         }
 
-        // 5. Salvare și Broadcast
         robotRepository.save(robot);
         messagingTemplate.convertAndSend("/topic/telemetry", robot);
     }
