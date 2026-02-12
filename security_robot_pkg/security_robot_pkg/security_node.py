@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Int32
 import json
 import base64
 from datetime import datetime
@@ -34,7 +34,18 @@ class SecurityNode(Node):
         # Flag to prevent spamming messages for the same detection event
         self.red_object_detected = False
         
+        self.current_battery_level = 100
+        self.battery_subscription = self.create_subscription(
+            Int32,
+            '/battery_level',
+            self.battery_callback,
+            10
+        )
+        
         self.get_logger().info("Security Node started. Watching for suspicious red objects...")
+
+    def battery_callback(self, msg):
+        self.current_battery_level = msg.data
 
     def image_callback(self, msg):
         try:
@@ -77,6 +88,7 @@ class SecurityNode(Node):
                     "imageBase64": image_base64,
                     "timestamp": datetime.now().isoformat(),
                     "status": "ALERT",
+                    "batteryLevel": self.current_battery_level,
                 }
                 with open("robot_alert.json", "w") as f:
                     json.dump(alert_data, f)
