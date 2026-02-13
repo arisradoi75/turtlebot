@@ -1,95 +1,78 @@
-# 🛡️ Robot Security Dashboard - Backend (Spring Boot)
+# 🛡️ Robot Security Dashboard - Central Backend Unit
 
-Această componentă reprezintă nucleul de control și monitorizare (Backend) pentru un sistem de securitate bazat pe un robot autonom, proiectat pentru supravegherea unei hale de producție. 
-
-Aplicația realizează puntea de legătură între simularea robotului din **ROS2/Gazebo** (executată pe un sistem Linux separat) și interfața utilizatorului.
+This repository contains the **Spring Boot 3** backend for a distributed security system. It acts as the "Command & Control" hub for an autonomous security robot simulated in **ROS2 and Gazebo** (running on a separate Linux node).
 
 ---
 
-## 📋 Prezentare Proiect
+## 🏗️ System Architecture & Workflow
 
-Sistemul este împărțit în două ramuri principale pe GitHub:
-1.  **Branch-ul de Backend (Acest cod):** Dezvoltat în Spring Boot, gestionează logica de business, securitatea, baza de date și comunicarea cu robotul.
-2.  **Branch-ul de Robot (Linux):** Conține scripturile Python, nodurile ROS2 și mediul de simulare Gazebo.
+The project is designed to facilitate real-time monitoring and remote control of a security robot within a production warehouse.
 
-### Fluxul de date:
-* **Robot ➔ Backend:** Robotul trimite telemetrie (coordonate $x, y$, nivel baterie) și alerte de securitate (cu capturi de imagine Base64) prin cereri HTTP POST.
-* **Backend ➔ Robot:** Comenzile de control (`START`, `STOP`, `DOCK`) sunt trimise de administrator din dashboard către API-ul robotului.
-* **Backend ➔ Frontend:** Datele sunt împinse în timp real către interfața web folosind **WebSockets (STOMP)**.
+### The Ecosystem:
+1.  **Robot Node (Linux/ROS2):** Handles SLAM, navigation, and computer vision. It sends telemetry and security alerts to this backend.
+2.  **Central Backend (This App):** Processes data, manages the MySQL database, handles JWT security, and broadcasts live updates via WebSockets.
+3.  **Admin Dashboard (Frontend):** Connects to this backend to visualize the robot's state and send manual overrides.
 
----
-
-## 🚀 Funcționalități Principale
-
-### 1. Control și Administrare
-* **Comenzi de la distanță:** Interfață securizată pentru trimiterea comenzilor de mișcare către robot.
-* **Restricții de acces:** Doar utilizatorii cu rol de `ADMIN` pot trimite comenzi robotului.
-
-### 2. Monitorizare Telemetrie
-* **Tracking Live:** Procesarea fluxului de coordonate primite de la robot.
-* **Management Baterie:** Dacă nivelul bateriei scade sub **15%**, sistemul generează automat o alertă internă de tip `LOW_BATTERY`.
-
-### 3. Securitate și Alerte
-* **Alerte de Intruziune:** Salvarea alertelor în baza de date MySQL, incluzând mesaje specifice și snapshot-uri (imagini) trimise de robot în format Base64.
-* **Arhivare:** Toate evenimentele sunt salvate cu timestamp-ul original de pe robot pentru audit ulterior.
-
-### 4. Autentificare JWT
-* Implementare completă de securitate cu **JSON Web Tokens**.
-* Suport pentru **Refresh Tokens** pentru a menține sesiunea activă fără login repetat.
-* Roluri definite: `ADMIN` (Control total) și `USER` (Doar vizualizare).
+### Data Flow:
+* **Inbound (Telemetry):** Robot $\rightarrow$ REST API $\rightarrow$ Database & WebSocket Broadcast.
+* **Inbound (Alerts):** Robot detects intruder $\rightarrow$ Sends Base64 image $\rightarrow$ Backend saves incident.
+* **Outbound (Commands):** Admin Dashboard $\rightarrow$ Backend $\rightarrow$ Robot Flask Bridge $\rightarrow$ ROS2 Action.
 
 ---
 
-## 🛠️ Tehnologii Utilizate
+## 🚀 Key Technical Features
 
-* **Framework:** Spring Boot 3
-* **Security:** Spring Security & JWT
-* **Bază de date:** MySQL (JPA/Hibernate)
-* **Comunicare Real-time:** Spring WebSocket + STOMP
-* **Limbaj:** Java 17
-* **Utilitare:** Lombok (pentru reducerea codului boilerplate)
+### 🔐 Enterprise-Grade Security
+* **JWT & Refresh Tokens:** Implements stateless authentication with `Json Web Tokens`.
+* **Role-Based Access Control (RBAC):** * `ADMIN`: Authorized to send movement commands (`START`, `STOP`, `DOCK`).
+    * `USER`: Authorized only to view the live dashboard and alert history.
+* **Custom Security Filter:** Validates every request via `AuthFilterService` before reaching the controllers.
 
----
+### 📊 Real-Time Monitoring & WebSockets
+* **Live Telemetry:** Tracks $(x, y)$ coordinates and battery levels in real-time.
+* **STOMP WebSockets:** Data is pushed instantly to the client via `/topic/telemetry` and `/topic/alerts`, ensuring zero-latency monitoring.
+* **Internal Logic:** The backend automatically generates a `LOW_BATTERY` alert if the robot's battery level drops below 15% without a charging status.
 
-## 📂 Structura Proiectului
-
-* `auth/` - Configurația securității, filtrarea JWT și logica de autentificare.
-* `controller/` - Endpoint-urile API pentru Admin (comenzi) și Robot (telemetrie/alerte).
-* `service/` - Logica de procesare a datelor și integrarea cu robotul prin `RestTemplate`.
-* `model/` & `dto/` - Entitățile bazei de date și obiectele de transfer de date.
-* `repository/` - Interfețele pentru persistența datelor în MySQL.
-* `config/` - Configurări pentru WebSockets și Bean-uri de sistem.
+### 🚨 Security Incident Handling
+* **Base64 Image Processing:** The system handles `LONGTEXT` image snapshots from the robot's camera for immediate visual verification of alerts.
+* **Persistence:** All events are logged in MySQL with original robot timestamps.
 
 ---
 
-## ⚙️ Configurare și Instalare
+## 🛠️ Technology Stack
 
-1.  **Baza de date:**
-    Asigură-te că ai un server MySQL pornit și creează o bază de date numită `robot_security`. Configurează credențialele în `application.properties`.
-
-2.  **Conexiunea cu Robotul:**
-    În clasa `CommandService.java`, modifică variabila `ROBOT_API_URL` cu IP-ul laptopului pe care rulează Linux/ROS2:
-    ```java
-    private final String ROBOT_API_URL = "http://<IP_LINUX>:5000/api/command";
-    ```
-
-3.  **Rulare:**
-    ```bash
-    mvn clean install
-    mvn spring-boot:run
-    ```
+* **Framework:** Java 17, Spring Boot 3.4
+* **Security:** Spring Security 6, JJWT (Json Web Token)
+* **Database:** MySQL 8.x, Spring Data JPA (Hibernate)
+* **Real-time:** Spring WebSocket (STOMP + SockJS)
+* **Communication:** RestTemplate (for Robot HTTP Bridge)
+* **Tooling:** Lombok, Maven
 
 ---
 
-## 📡 Endpoint-uri API (Sumar)
+## 📂 Project Structure
 
-| Metodă | URL | Acces | Descriere |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/**` | Public | Login / Register / Refresh |
-| `POST` | `/api/robot/telemetry` | Robot | Primește date de la ROS2 |
-| `POST` | `/api/robot/alert` | Robot | Primește alerte cu imagini |
-| `POST` | `/api/admin/start` | ADMIN | Pornește patrula robotului |
-| `POST` | `/api/admin/stop` | ADMIN | Oprire de urgență |
+| Package | Responsibility |
+| :--- | :--- |
+| **`.auth`** | Security configuration, JWT logic, and User/Role management. |
+| **`.controller`** | REST Endpoints for Admin commands and Robot data ingestion. |
+| **`.service`** | Business logic for commands, alerts, and telemetry processing. |
+| **`.model` / `.dto`** | Database Entities (JPA) and Data Transfer Objects. |
+| **`.repository`** | Interfaces for MySQL database operations. |
+| **`.config`** | WebSocket and Global application beans. |
 
 ---
-*Acest proiect a fost dezvoltat ca parte a sistemului integrat de monitorizare pentru TurtleBot.*
+
+## ⚙️ Configuration & Setup
+
+### 1. Prerequisites
+* JDK 17+
+* MySQL Server
+* Local network connectivity between the Java host and the Linux/ROS2 host.
+
+### 2. Database Setup
+Update `src/main/resources/application.properties` with your MySQL credentials:
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/robot_security_db
+spring.datasource.username=your_user
+spring.datasource.password=your_password
