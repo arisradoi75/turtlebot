@@ -1,3 +1,122 @@
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Robot.java
+package com.example.robot.model;
+
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "robot_telemetry")
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Data
+public class Robot {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private double x;
+    private double y;
+    private double batteryLevel;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 25)
+    private RobotStatus status;
+
+    private LocalDateTime timestamp;
+
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/RobotStatus.java
+package com.example.robot.model;
+
+public enum RobotStatus {
+    PATROLLING,
+    ALERT,
+    CHARGING,
+    DOCKING
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/RobotStatusDTO.java
+package com.example.robot.dto;
+
+import lombok.Data;
+
+@Data
+public class RobotStatusDTO {
+    private double x;
+    private double y;
+    private double batteryLevel;
+    private String status;
+    private String timestamp;
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/RobotService.java
+package com.example.robot.service;
+
+import com.example.robot.dto.RobotStatusDTO;
+import com.example.robot.model.Robot;
+import com.example.robot.model.RobotStatus;
+import com.example.robot.repository.RobotRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class RobotService {
+    private final RobotRepository robotRepository;
+    private final AlertService alertService; // Injectăm AlertService pentru a semnala probleme
+    private final SimpMessagingTemplate messagingTemplate;
+
+    public void processTelemetry(RobotStatusDTO dto) {
+        Robot robot = new Robot();
+
+        robot.setX(dto.getX());
+        robot.setY(dto.getY());
+        robot.setBatteryLevel(dto.getBatteryLevel());
+
+        try {
+            if (dto.getStatus() != null) {
+                robot.setStatus(RobotStatus.valueOf(dto.getStatus().toUpperCase()));
+            } else {
+                robot.setStatus(RobotStatus.ALERT);
+            }
+        } catch (IllegalArgumentException e) {
+            System.err.println("Status necunoscut primit: " + dto.getStatus());
+            robot.setStatus(RobotStatus.ALERT);
+        }
+
+        if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
+            try {
+                robot.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
+            } catch (Exception e) {
+                robot.setTimestamp(LocalDateTime.now());
+            }
+        } else {
+            robot.setTimestamp(LocalDateTime.now());
+        }
+
+        if (robot.getBatteryLevel() < 15.0 && robot.getStatus() != RobotStatus.CHARGING) {
+            alertService.createInternalAlert("LOW_BATTERY",
+                    "Bateria robotului este critică (" + robot.getBatteryLevel() + "%) și nu încarcă!");
+        }
+
+        robotRepository.save(robot);
+        messagingTemplate.convertAndSend("/topic/telemetry", robot);
+    }
+}
+
+// ... (restul fișierelor, pe care le-am citit deja și le voi adăuga aici) ...
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/entities/User.java
 package com.example.robot.auth.entities;
 
@@ -485,20 +604,6 @@ public class AlertDTO {
     private String status;
 }
 
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/RobotStatusDTO.java
-package com.example.robot.dto;
-
-import lombok.Data;
-
-@Data
-public class RobotStatusDTO {
-    private double x;
-    private double y;
-    private double batteryLevel;
-    private String status;
-    private String timestamp;
-}
-
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Alert.java
 package com.example.robot.model;
 
@@ -535,51 +640,6 @@ public class Alert {
 
     private String status;
 
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Robot.java
-package com.example.robot.model;
-
-
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "robot_telemetry")
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@Data
-public class Robot {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    private double x;
-    private double y;
-    private double batteryLevel;
-
-    @Enumerated(EnumType.STRING)
-    private RobotStatus status;
-
-    private LocalDateTime timestamp;
-
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/RobotStatus.java
-package com.example.robot.model;
-
-public enum RobotStatus {
-    PATROLLING,
-    IDLE,
-    CHARGING,
-    DOCKING
 }
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/AlertService.java
@@ -654,65 +714,6 @@ public class AlertService {
         simpMessagingTemplate.convertAndSend("/topic/alerts", savedAlert);
 
         System.out.println("🚨 ALERTA SALVATĂ: " + alert.getAlertType() + " - " + alert.getMessage());
-    }
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/RobotService.java
-package com.example.robot.service;
-
-import com.example.robot.dto.RobotStatusDTO;
-import com.example.robot.model.Robot;
-import com.example.robot.model.RobotStatus;
-import com.example.robot.repository.RobotRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-
-@Service
-@RequiredArgsConstructor
-public class RobotService {
-    private final RobotRepository robotRepository;
-    private final AlertService alertService; // Injectăm AlertService pentru a semnala probleme
-    private final SimpMessagingTemplate messagingTemplate;
-
-    public void processTelemetry(RobotStatusDTO dto) {
-        Robot robot = new Robot();
-
-        robot.setX(dto.getX());
-        robot.setY(dto.getY());
-        robot.setBatteryLevel(dto.getBatteryLevel());
-
-        try {
-            if (dto.getStatus() != null) {
-                robot.setStatus(RobotStatus.valueOf(dto.getStatus().toUpperCase()));
-            } else {
-                robot.setStatus(RobotStatus.IDLE);
-            }
-        } catch (IllegalArgumentException e) {
-            System.err.println("Status necunoscut primit: " + dto.getStatus());
-            robot.setStatus(RobotStatus.IDLE);
-        }
-
-        if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
-            try {
-                robot.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
-            } catch (Exception e) {
-                robot.setTimestamp(LocalDateTime.now());
-            }
-        } else {
-            robot.setTimestamp(LocalDateTime.now());
-        }
-
-        if (robot.getBatteryLevel() < 15.0 && robot.getStatus() != RobotStatus.CHARGING) {
-            alertService.createInternalAlert("LOW_BATTERY",
-                    "Bateria robotului este critică (" + robot.getBatteryLevel() + "%) și nu încarcă!");
-        }
-
-        // 5. Salvare și Broadcast
-        robotRepository.save(robot);
-        messagingTemplate.convertAndSend("/topic/telemetry", robot);
     }
 }
 
@@ -814,7 +815,7 @@ public class RobotController {
         this.alertService = alertService;
     }
 
-    @PostMapping("/telemtry")
+    @PostMapping("/telemetry")
     public ResponseEntity<String> reciveTelemetry(@RequestBody RobotStatusDTO dto){
         robotService.processTelemetry(dto);
         return ResponseEntity.ok("UPDATE!");
@@ -835,7 +836,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface AlertRepository extends JpaRepository<Alert, Long> {
-    List<Alert> findbyStatus(String status);
+    List<Alert> findByStatus(String status);
 }
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/repository/RobotRepository.java
@@ -966,7 +967,7 @@ public class ApplicationConfig {
 }
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/config/SecurityConfiguration.java
-package com.example.robot.auth.config; // Atenție la pachet!
+package com.example.robot.auth.config;
 
 import com.example.robot.auth.services.AuthFilterService;
 import lombok.RequiredArgsConstructor;
@@ -982,9 +983,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@RequiredArgsConstructor
-@EnableMethodSecurity
 @EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfiguration {
 
     private final AuthFilterService authFilterService;
@@ -994,17 +995,16 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        // 1. Auth (Login/Register) - PUBLIC
+                .authorizeHttpRequests(req -> req
+                        // Rute Publice
                         .requestMatchers("/api/v1/auth/**").permitAll()
-
-                        // 2. Robot API (Python trimite date) - PUBLIC
                         .requestMatchers("/api/robot/**").permitAll()
-
-                        // 3. WebSocket (Harta Live) - PUBLIC
                         .requestMatchers("/ws-robot/**").permitAll()
 
-                        // 4. Restul - DOAR CU LOGIN
+                        // Rute de Admin - NECESITĂ ROL DE ADMIN
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+
+                        // Orice altceva necesită doar Autentificare
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

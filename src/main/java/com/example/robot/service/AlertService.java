@@ -25,14 +25,14 @@ public class AlertService {
         alert.setMessage(dto.getMessage());
         alert.setSnapshotBase64(dto.getImageBase64());
 
-        // 2. Gestionare Status (Default: NEW)
+
         if (dto.getStatus() != null && !dto.getStatus().isEmpty()) {
             alert.setStatus(dto.getStatus().toUpperCase());
         } else {
             alert.setStatus("NEW");
         }
 
-        // 3. Gestionare Timp (De la Robot sau Acum)
+
         if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
             try {
                 alert.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
@@ -46,9 +46,7 @@ public class AlertService {
         saveAndBroadcast(alert);
     }
 
-    /**
-     * Metodă internă pentru a crea alerte generate de server (ex: Baterie Critică)
-     */
+
     public void createInternalAlert(String type, String message) {
         Alert alert = Alert.builder()
                 .alertType(type)
@@ -60,12 +58,12 @@ public class AlertService {
         saveAndBroadcast(alert);
     }
 
-    // Metodă ajutătoare pentru a nu repeta codul de salvare
+
     private void saveAndBroadcast(Alert alert) {
-        // Salvare în MySQL
+
         Alert savedAlert = alertRepository.save(alert);
 
-        // Trimitere Live pe WebSocket (către Dashboard)
+
         simpMessagingTemplate.convertAndSend("/topic/alerts", savedAlert);
 
         System.out.println("🚨 ALERTA SALVATĂ: " + alert.getAlertType() + " - " + alert.getMessage());

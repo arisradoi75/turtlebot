@@ -3,8 +3,6 @@ package com.example.robot.controller;
 import com.example.robot.service.CommandService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,21 +18,21 @@ public class AdminController {
     @PreAuthorize("hasAuthority('ADMIN')")
     @PostMapping("/dock")
     public ResponseEntity<String> sendToDock() {
-        commandService.sendCommand("DOCK"); // Temporarily commented out for testing without robot IP
+        commandService.sendCommand("DOCK");
         return ResponseEntity.ok("Comanda [DOCK] a fost trimisă!");
     }
 
-    @PostMapping("/patrol")
+    @PostMapping("/start")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<String> startPatrol() {
-        commandService.sendCommand("PATROL"); // Temporarily commented out
-        return ResponseEntity.ok("Comanda [PATROL] a fost trimisă!");
+    public ResponseEntity<String> startRobot() {
+        commandService.sendCommand("START");
+        return ResponseEntity.ok("Comanda [START] a fost trimisă!");
     }
 
     @PostMapping("/stop")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<String> stopRobot() {
-        commandService.sendCommand("STOP"); // Temporarily commented out
+        commandService.sendCommand("STOP");
         return ResponseEntity.ok("Robotul a fost OPRIT de urgență!");
     }
 }
