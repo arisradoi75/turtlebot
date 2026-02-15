@@ -92,8 +92,12 @@ class PatrolManager:
         self.last_x = 0.0
         self.last_y = 0.0
         self.last_battery_decay_time = time.time()
+        self.battery_dead = False
 
     def start(self):
+        if self.battery_dead:
+            print("Cannot start: Battery is dead.")
+            return False
         if self.patrolling:
             return False
         
@@ -164,6 +168,14 @@ class PatrolManager:
         
         if self.charging:
             update_status_file("CHARGING", x, y, self.battery_level)
+            
+            while self.charging and self.battery_level < 100:
+                time.sleep(10)
+                if not self.charging: break
+                self.battery_level = min(100, self.battery_level + 10)
+                self.monitor.publish_battery(self.battery_level)
+                update_status_file("CHARGING", x, y, self.battery_level)
+            
             self.charging = False
 
     def run(self):
@@ -174,12 +186,20 @@ class PatrolManager:
                 if not self.patrolling: break
                 
                 # Battery decay logic
-                if time.time() - self.last_battery_decay_time >= 10.0:
+                if time.time() - self.last_battery_decay_time >= 60.0:
                     self.battery_level = max(0, self.battery_level - 10)
                     self.last_battery_decay_time = time.time()
                     self.monitor.publish_battery(self.battery_level)
-                    if self.battery_level <= 20:
+                    
+                    if self.battery_level == 0:
+                        self.battery_dead = True
+                        self.stop()
+                        return
+
+                    if self.battery_level < 20:
                         send_battery_alert(self.battery_level)
+                        self.go_to_charge()
+                        return
 
                 # Check for intruder
                 rclpy.spin_once(self.monitor, timeout_sec=0.1)
@@ -208,12 +228,20 @@ class PatrolManager:
                         pos = feedback.current_pose.pose.position
                         self.last_x, self.last_y = pos.x, pos.y
                         
-                        if time.time() - self.last_battery_decay_time >= 10.0:
+                        if time.time() - self.last_battery_decay_time >= 60.0:
                             self.battery_level = max(0, self.battery_level - 10)
                             self.last_battery_decay_time = time.time()
                             self.monitor.publish_battery(self.battery_level)
-                            if self.battery_level <= 20:
+                            
+                            if self.battery_level == 0:
+                                self.battery_dead = True
+                                self.stop()
+                                return
+
+                            if self.battery_level < 20:
                                 send_battery_alert(self.battery_level)
+                                self.go_to_charge()
+                                return
                         
                         update_status_file("PATROLLING", self.last_x, self.last_y, self.battery_level)
                     
@@ -301,72 +329,13 @@ def main(args=None):
     flask_thread.daemon = True
     flask_thread.start()
     
-    # self_patrolling = True
-    # last_x, last_y = 0.0, 0.0
-    # battery_level = 100
-    # last_battery_decay_time = time.time()
-    # monitor.publish_battery(battery_level)
     print(f"Patrol Node Started. \nListening for commands on: http://172.20.10.12:5000\nSending telemetry to: http://172.20.10.2:8080 (Check this IP!)")
     
-    # while rclpy.ok() and self_patrolling:
-    #     for x, y in waypoints_coords:
-    #         # Battery decay logic
-    #         if time.time() - last_battery_decay_time >= 10.0:
-    #             battery_level = max(0, battery_level - 10)
-    #             last_battery_decay_time = time.time()
-    #             monitor.publish_battery(battery_level)
-    #             if battery_level <= 20:
-    #                 send_battery_alert(battery_level)
     try:
         while rclpy.ok():
             time.sleep(1)
     except KeyboardInterrupt:
         pass
-
-            # # Check for intruder before sending the next goal
-            # rclpy.spin_once(monitor, timeout_sec=0.1)
-            # if monitor.intruder_detected:
-            #     update_status_file("ALERT", last_x, last_y, battery_level)
-            #     self_patrolling = False
-            #     break
-            
-            # # Create goal pose
-            # goal = PoseStamped()
-            # goal.header.frame_id = 'map'
-            # goal.header.stamp = navigator.get_clock().now().to_msg()
-            # goal.pose.position.x = x
-            # goal.pose.position.y = y
-            # goal.pose.orientation.w = 1.0
-            
-            # navigator.goToPose(goal)
-            
-            # # Wait for the robot to reach the waypoint
-            # while not navigator.isTaskComplete():
-            #     feedback = navigator.getFeedback()
-            #     if feedback:
-            #         pos = feedback.current_pose.pose.position
-            #         last_x, last_y = pos.x, pos.y
-                    
-            #         # Battery decay logic while moving
-            #         if time.time() - last_battery_decay_time >= 10.0:
-            #             battery_level = max(0, battery_level - 10)
-            #             last_battery_decay_time = time.time()
-            #             monitor.publish_battery(battery_level)
-            #             if battery_level <= 20:
-            #                 send_battery_alert(battery_level)
-
-            #         update_status_file("PATROLLING", last_x, last_y, battery_level)
-
-            #     # Check for alerts while moving
-            #     rclpy.spin_once(monitor, timeout_sec=0.1)
-            #     if monitor.intruder_detected:
-            #         navigator.cancelTask()
-            #         update_status_file("ALERT", last_x, last_y, battery_level)
-            #         self_patrolling = False
-            #         break
-            
-            # if not self_patrolling:
-            #     break
 
     monitor.destroy_node()
     rclpy.shutdown()

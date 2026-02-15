@@ -3,7 +3,6 @@ import rclpy
 from rclpy.node import Node
 import cv2
 import numpy as np
-from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Int32
 import json
@@ -14,9 +13,6 @@ import requests
 class SecurityNode(Node):
     def __init__(self):
         super().__init__('security_node')
-        
-        # Initialize CvBridge
-        self.bridge = CvBridge()
         
         # Subscribe to the camera topic
         # In ROS 2 TurtleBot simulations, the topic is often '/camera/image_raw'
@@ -48,11 +44,14 @@ class SecurityNode(Node):
         self.current_battery_level = msg.data
 
     def image_callback(self, msg):
-        try:
-            # Convert ROS Image message to OpenCV image
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        except CvBridgeError as e:
-            self.get_logger().error(f"CvBridge Error: {e}")
+        # Manual conversion to avoid cv_bridge/numpy 2.x conflict
+        if msg.encoding == 'bgr8':
+            cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+        elif msg.encoding == 'rgb8':
+            cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
+        else:
+            self.get_logger().warn(f"Unsupported encoding: {msg.encoding}")
             return
 
         # Convert BGR to HSV (Hue, Saturation, Value)
