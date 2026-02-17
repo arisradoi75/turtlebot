@@ -2,7 +2,7 @@
 
 A real-time monitoring and control interface built with **React** for a TurtleBot security system. This frontend communicates with a **Spring Boot** backend using REST APIs for authentication/history and WebSockets for live telemetry.
 
-## 🚀 Features
+##  Features
 
 * **Real-time Telemetry:** Live updates of robot status, battery levels, and coordinates $(X, Y)$ via WebSockets (STOMP/SockJS).
 * **Live Alerts:** Instant notifications with Base64 image snapshots when security events are detected.
@@ -12,7 +12,7 @@ A real-time monitoring and control interface built with **React** for a TurtleBo
 * **Historical Data:** Fetches the last known robot state and previous alerts from the database upon login.
 * **Responsive Design:** Clean, organized layout with separate sections for Live Data, Control, and Database History.
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 * **Framework:** React (Vite)
 * **State Management:** React Hooks (`useState`, `useEffect`, `useRef`)
@@ -21,13 +21,13 @@ A real-time monitoring and control interface built with **React** for a TurtleBo
 * **Real-time Communication:** SockJS-client & StompJS
 * **Security:** JWT Decoding (`jwt-decode`)
 
-## 📋 Prerequisites
+##  Prerequisites
 
 Before running this application, ensure you have:
 * [Node.js](https://nodejs.org/) (v16 or higher)
 * The Spring Boot Backend server running on `http://localhost:8080`
 
-## ⚙️ Installation & Setup
+##  Installation & Setup
 
 1.  **Clone the repository:**
     ```bash
@@ -51,7 +51,7 @@ Before running this application, ensure you have:
     npm run dev
     ```
 
-## 🔌 API & WebSocket Integration
+##  API & WebSocket Integration
 
 | Connection Type | Endpoint | Description |
 | :--- | :--- | :--- |
@@ -62,7 +62,7 @@ Before running this application, ensure you have:
 | **Topic** | `/topic/telemetry` | Live robot status updates |
 | **Topic** | `/topic/alerts` | Live security alerts with snapshots |
 
-## 📂 Project Structure
+##  Project Structure
 
 ```text
 src/
