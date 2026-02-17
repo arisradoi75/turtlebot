@@ -2,6 +2,8 @@ package com.example.robot.controller;
 
 import com.example.robot.dto.AlertDTO;
 import com.example.robot.dto.RobotStatusDTO;
+import com.example.robot.model.Alert;
+import com.example.robot.model.Robot;
 import com.example.robot.service.AlertService;
 import com.example.robot.service.RobotService;
 import org.springframework.http.ResponseEntity;
@@ -30,5 +32,15 @@ public class RobotController {
     public ResponseEntity<String> reciveAlert(@RequestBody AlertDTO dto) {
         alertService.processAlertFromRobot(dto);
         return ResponseEntity.ok("Alert saved!");
+    }
+
+    @GetMapping("/latest-telemetry")
+    public ResponseEntity<Robot> getLatestTelemetry() {
+        return ResponseEntity.ok(robotService.getLatestTelemetry());
+    }
+
+    @GetMapping("/latest-alert")
+    public ResponseEntity<Alert> getLatestAlert() {
+        return ResponseEntity.ok(alertService.getLatestAlert());
     }
 }

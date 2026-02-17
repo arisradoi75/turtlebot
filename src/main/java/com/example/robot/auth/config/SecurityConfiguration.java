@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -26,16 +27,18 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(req -> req
-                        // Rute Publice
+                        // API-uri Publice (autentificare, handshake WebSocket și primire date de la robot)
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/robot/**").permitAll()
                         .requestMatchers("/ws-robot/**").permitAll()
+                        .requestMatchers("/api/robot/telemetry").permitAll() // Folosit de scriptul Python
+                        .requestMatchers("/api/robot/alert").permitAll()    // Folosit de scriptul Python
 
-                        // Rute de Admin - NECESITĂ ROL DE ADMIN
+                        // API-uri de Admin - NECESITĂ ROL DE ADMIN
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
 
-                        // Orice altceva necesită doar Autentificare
+                        // Orice altceva (inclusiv /api/robot/latest-telemetry) necesită doar Autentificare
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

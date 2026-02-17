@@ -68,4 +68,8 @@ public class AlertService {
 
         System.out.println("🚨 ALERTA SALVATĂ: " + alert.getAlertType() + " - " + alert.getMessage());
     }
+
+    public Alert getLatestAlert() {
+        return alertRepository.findTopByOrderByTimestampDesc().orElse(null);
+    }
 }

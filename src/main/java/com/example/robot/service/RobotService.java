@@ -53,4 +53,10 @@ public class RobotService {
         robotRepository.save(robot);
         messagingTemplate.convertAndSend("/topic/telemetry", robot);
     }
+    public Robot getLatestTelemetry() {
+        return robotRepository.findTopByOrderByTimestampDesc().orElse(null);
+    }
+
+
+
 }
