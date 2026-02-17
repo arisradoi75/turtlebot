@@ -8,7 +8,7 @@ This is the backend for a **TurtleBot** security and monitoring system. Built us
 
 The system utilizes a **Layered Architecture** connecting the User, Server, and Robot.
 
-```text
+text
 +-------------+        +--------------------------+        +-------------------+
 |   USER      | -----> |   FRONTEND DASHBOARD     | <----> |   BACKEND API     |
 | (Browser)   |        | (React/Vue/Angular)      |        | (Spring Boot)     |
