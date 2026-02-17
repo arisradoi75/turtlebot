@@ -190,7 +190,7 @@ The system is designed using a **Layered Architecture**, separating control logi
 
 ## 📊 Data Flow Diagram
 
-```mermaid
+mermaid
 graph TD
     %% Node Definitions
     User((User / Admin))
@@ -198,18 +198,14 @@ graph TD
     BE[⚙️ Spring Boot Backend]
     DB[(🗄️ MySQL Database)]
     ROBOT[🤖 TurtleBot 3]
-
     %% Relationships
     User -->|UI Interaction| FE
     FE -->|REST API (Auth, Commands)| BE
     BE <-->|WebSocket (Live Data)| FE
-    
     BE -->|JPA / Hibernate| DB
-    
     ROBOT -->|POST /telemetry| BE
     ROBOT -->|POST /alert (Base64)| BE
     BE -.->|POST /command (HTTP)| ROBOT
-
     %% Sub-graph for Backend Internals
     subgraph "Backend Services"
     AUTH[Auth Service]
