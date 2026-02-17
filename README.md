@@ -6,35 +6,24 @@ This is the backend for a **TurtleBot** security and monitoring system. Built us
 
 ## 🏗️ System Architecture
 
-The system utilizes a **Layered Architecture** to ensure scalability and separation of concerns.
+The system utilizes a **Layered Architecture** connecting the User, Server, and Robot.
 
-```mermaid
-graph TD
-    %% Node Definitions
-    User((User / Admin))
-    FE[💻 Frontend Dashboard]
-    BE[⚙️ Spring Boot Backend]
-    DB[(🗄️ MySQL Database)]
-    ROBOT[🤖 TurtleBot 3]
-
-    %% Relationships
-    User -->|UI Interaction| FE
-    FE -->|REST API (Auth, Commands)| BE
-    BE <-->|WebSocket (Live Data)| FE
-    
-    BE -->|JPA / Hibernate| DB
-    
-    ROBOT -->|POST /telemetry| BE
-    ROBOT -->|POST /alert (Base64)| BE
-    BE -.->|POST /command (HTTP)| ROBOT
-
-    %% Sub-graph for Backend Internals
-    subgraph "Backend Services"
-    AUTH[Auth Service]
-    CMD[Command Service]
-    PROCESS[Telemetry Processor]
-    end
-```
+```text
++-------------+        +--------------------------+        +-------------------+
+|   USER      | -----> |   FRONTEND DASHBOARD     | <----> |   BACKEND API     |
+| (Browser)   |        | (React/Vue/Angular)      |        | (Spring Boot)     |
++-------------+        +--------------------------+        +-------------------+
+                                                                    ^    |
+                                                                    |    v
+                                                           +-------------------+
+                                                           |  MYSQL DATABASE   |
+                                                           +-------------------+
+                                                                    ^    |
+                                                                    |    v
+                                                           +-------------------+
+                                                           |  TURTLEBOT ROBOT  |
+                                                           | (Python / ROS)    |
+                                                           +-------------------+
 
 ---
 
