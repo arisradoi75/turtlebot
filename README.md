@@ -174,7 +174,7 @@ Used by the Frontend Dashboard to receive live updates.
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 ```bash
 src/main/java/com/example/robot
