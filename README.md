@@ -184,12 +184,35 @@ Used by the Frontend Dashboard to receive live updates.
 | `/topic/telemetry` | Live robot coordinates & battery | Same as Telemetry JSON |
 | `/topic/alerts` | Incoming security alerts | Same as Alert JSON |
 
+# 🏗️ System Architecture
 
-src/main/java/com/example/robot
-├── 🔐 auth/                 # Securitate (JWT, Filtre, Config)
-├── ⚙️ config/               # Configurații globale (CORS, WebSocket)
-├── 🎮 controller/           # API Endpoints (REST)
-├── 📦 dto/                  # Obiecte de transfer de date (JSON mapping)
-├── 🗃️ model/                # Entități Database (ORM)
-├── 💾 repository/           # Interfețe SQL (Spring Data JPA)
-└── 🛠️ service/              # Logică de business
+The system is designed using a **Layered Architecture**, separating control logic, data persistence, and hardware communication into distinct modules.
+
+## 📊 Data Flow Diagram
+
+```mermaid
+graph TD
+    %% Node Definitions
+    User((User / Admin))
+    FE[💻 Frontend Dashboard]
+    BE[⚙️ Spring Boot Backend]
+    DB[(🗄️ MySQL Database)]
+    ROBOT[🤖 TurtleBot 3]
+
+    %% Relationships
+    User -->|UI Interaction| FE
+    FE -->|REST API (Auth, Commands)| BE
+    BE <-->|WebSocket (Live Data)| FE
+    
+    BE -->|JPA / Hibernate| DB
+    
+    ROBOT -->|POST /telemetry| BE
+    ROBOT -->|POST /alert (Base64)| BE
+    BE -.->|POST /command (HTTP)| ROBOT
+
+    %% Sub-graph for Backend Internals
+    subgraph "Backend Services"
+    AUTH[Auth Service]
+    CMD[Command Service]
+    PROCESS[Telemetry Processor]
+    end
