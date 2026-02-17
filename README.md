@@ -1,8 +1,8 @@
-# 🤖 Robot Security Dashboard (Backend)
+# Robot Security Dashboard (Backend)
 
 This is the backend for a **TurtleBot** security and monitoring system. Built using **Java Spring Boot 3**, it serves as the Command and Control (C2) center. It handles user authentication, receives real-time telemetry from the robot, processes security alerts, and sends control commands to the robot.
 
-## 🌟 Key Features
+## Key Features
 
 ### 1. Security & Authentication
 * **JWT (JSON Web Tokens):** Complete system for login, registration, and token validation.
@@ -23,7 +23,7 @@ This is the backend for a **TurtleBot** security and monitoring system. Built us
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Category | Technology |
 | :--- | :--- |
@@ -36,7 +36,7 @@ This is the backend for a **TurtleBot** security and monitoring system. Built us
 
 ---
 
-## 🚀 Installation and Setup
+## Installation and Setup
 
 ### 1. Prerequisites
 * JDK 17 or newer
@@ -58,7 +58,7 @@ application.security.jwt.secret-key=BF7FD11ACE545745B7BA1AF98B6F156D127BC7BB544B
 ```
 
 ### 3. Robot IP Configuration
-⚠️ **Important:** The robot's IP address is currently hardcoded in `CommandService.java`.
+ **Important:** The robot's IP address is currently hardcoded in `CommandService.java`.
 Check the following line before running:
 ```java
 private final String ROBOT_API_URL = "[http://172.20.10.12:5000/api/command](http://172.20.10.12:5000/api/command)";
@@ -73,11 +73,11 @@ mvn spring-boot:run
 
 ---
 
-## 📡 API Documentation
+##  API Documentation
 
 The backend exposes a RESTful API reachable at `http://localhost:8080`.
 
-### 🔐 Authentication & Authorization
+###  Authentication & Authorization
 Most endpoints require a valid **JWT Token** in the HTTP Header.
 * **Header Format:** `Authorization: Bearer <your_access_token>`
 * **Roles:**
@@ -87,7 +87,7 @@ Most endpoints require a valid **JWT Token** in the HTTP Header.
 ### 1. Authentication Endpoints
 **Base URL:** `/api/v1/auth` (Public)
 
-#### 📝 Register
+####  Register
 Create a new user account.
 * **URL:** `/register`
 * **Method:** `POST`
@@ -101,7 +101,7 @@ Create a new user account.
     }
     ```
 
-#### 🔑 Login
+####  Login
 Authenticate an existing user.
 * **URL:** `/login`
 * **Method:** `POST`
@@ -129,7 +129,7 @@ Authenticate an existing user.
 **Base URL:** `/api/robot`
 *Used by the TurtleBot (ROS/Python) to push data.*
 
-#### 📍 Send Telemetry
+####  Send Telemetry
 Updates the robot's current status, battery, and location.
 * **URL:** `/telemetry`
 * **Method:** `POST`
@@ -144,7 +144,7 @@ Updates the robot's current status, battery, and location.
     }
     ```
 
-#### 🚨 Send Security Alert
+####  Send Security Alert
 Triggered when the robot detects an anomaly.
 * **URL:** `/alert`
 * **Method:** `POST`
@@ -160,7 +160,7 @@ Triggered when the robot detects an anomaly.
 
 ---
 
-## ⚡ WebSocket API (Real-time)
+##  WebSocket API (Real-time)
 Used by the Frontend Dashboard to receive live updates.
 
 * **Connection Endpoint:** `ws://localhost:8080/ws-robot`
@@ -178,11 +178,11 @@ Used by the Frontend Dashboard to receive live updates.
 
 ```bash
 src/main/java/com/example/robot
-├── 🔐 auth/                 # JWT Logic, User Details, Auth Service
-├── ⚙️ config/               # Security and WebSocket Configuration
-├── 🎮 controller/           # REST Controllers
-├── 📦 dto/                  # Data Transfer Objects
-├── 🗃️ model/                # Database Entities (Hibernate)
-├── 💾 repository/           # JPA Interfaces
-└── 🛠️ service/              # Business Logic (Commands, Processing)
+├──  auth/                 # JWT Logic, User Details, Auth Service
+├──  config/               # Security and WebSocket Configuration
+├──  controller/           # REST Controllers
+├──  dto/                  # Data Transfer Objects
+├──  model/                # Database Entities (Hibernate)
+├──  repository/           # JPA Interfaces
+└──  service/              # Business Logic (Commands, Processing)
 ```
