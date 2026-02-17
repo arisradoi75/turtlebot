@@ -46,7 +46,7 @@ This is the backend for a **TurtleBot** security and monitoring system. Built us
 ### 2. Database Configuration
 Create an empty database named `robot_db`. Then, configure `src/main/resources/application.properties`:
 
-```properties
+properties
 spring.datasource.url=jdbc:mysql://localhost:3306/robot_db
 spring.datasource.username=root
 spring.datasource.password=your_password
