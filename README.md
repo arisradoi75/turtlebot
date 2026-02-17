@@ -2,31 +2,6 @@
 
 This is the backend for a **TurtleBot** security and monitoring system. Built using **Java Spring Boot 3**, it serves as the Command and Control (C2) center. It handles user authentication, receives real-time telemetry from the robot, processes security alerts, and sends control commands to the robot.
 
----
-
-## 🏗️ System Architecture
-
-The system utilizes a **Layered Architecture** connecting the User, Server, and Robot.
-
-text
-+-------------+        +--------------------------+        +-------------------+
-|   USER      | -----> |   FRONTEND DASHBOARD     | <----> |   BACKEND API     |
-| (Browser)   |        | (React/Vue/Angular)      |        | (Spring Boot)     |
-+-------------+        +--------------------------+        +-------------------+
-                                                                    ^    |
-                                                                    |    v
-                                                           +-------------------+
-                                                           |  MYSQL DATABASE   |
-                                                           +-------------------+
-                                                                    ^    |
-                                                                    |    v
-                                                           +-------------------+
-                                                           |  TURTLEBOT ROBOT  |
-                                                           | (Python / ROS)    |
-                                                           +-------------------+
-
----
-
 ## 🌟 Key Features
 
 ### 1. Security & Authentication
