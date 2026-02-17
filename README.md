@@ -2,6 +2,42 @@
 
 This is the backend for a **TurtleBot** security and monitoring system. Built using **Java Spring Boot 3**, it serves as the Command and Control (C2) center. It handles user authentication, receives real-time telemetry from the robot, processes security alerts, and sends control commands to the robot.
 
+---
+
+## 🏗️ System Architecture
+
+The system utilizes a **Layered Architecture** to ensure scalability and separation of concerns.
+
+```mermaid
+graph TD
+    %% Node Definitions
+    User((User / Admin))
+    FE[💻 Frontend Dashboard]
+    BE[⚙️ Spring Boot Backend]
+    DB[(🗄️ MySQL Database)]
+    ROBOT[🤖 TurtleBot 3]
+
+    %% Relationships
+    User -->|UI Interaction| FE
+    FE -->|REST API (Auth, Commands)| BE
+    BE <-->|WebSocket (Live Data)| FE
+    
+    BE -->|JPA / Hibernate| DB
+    
+    ROBOT -->|POST /telemetry| BE
+    ROBOT -->|POST /alert (Base64)| BE
+    BE -.->|POST /command (HTTP)| ROBOT
+
+    %% Sub-graph for Backend Internals
+    subgraph "Backend Services"
+    AUTH[Auth Service]
+    CMD[Command Service]
+    PROCESS[Telemetry Processor]
+    end
+```
+
+---
+
 ## 🌟 Key Features
 
 ### 1. Security & Authentication
@@ -46,7 +82,7 @@ This is the backend for a **TurtleBot** security and monitoring system. Built us
 ### 2. Database Configuration
 Create an empty database named `robot_db`. Then, configure `src/main/resources/application.properties`:
 
-properties
+```properties
 spring.datasource.url=jdbc:mysql://localhost:3306/robot_db
 spring.datasource.username=root
 spring.datasource.password=your_password
@@ -55,26 +91,39 @@ spring.jpa.show-sql=true
 
 # JWT Secret (Change this in production!)
 application.security.jwt.secret-key=BF7FD11ACE545745B7BA1AF98B6F156D127BC7BB544BAB6A4FD74E4FC7
+```
 
+### 3. Robot IP Configuration
+⚠️ **Important:** The robot's IP address is currently hardcoded in `CommandService.java`.
+Check the following line before running:
+```java
+private final String ROBOT_API_URL = "[http://172.20.10.12:5000/api/command](http://172.20.10.12:5000/api/command)";
+```
+If your robot has a different IP on the local network, update this string.
 
-# 📡 API Documentation
+### 4. Running the App
+```bash
+mvn clean install
+mvn spring-boot:run
+```
+
+---
+
+## 📡 API Documentation
 
 The backend exposes a RESTful API reachable at `http://localhost:8080`.
 
-## 🔐 Authentication & Authorization
+### 🔐 Authentication & Authorization
 Most endpoints require a valid **JWT Token** in the HTTP Header.
 * **Header Format:** `Authorization: Bearer <your_access_token>`
 * **Roles:**
     * `USER`: Read-only access (Telemetry, Alerts).
     * `ADMIN`: Write access (Robot Commands).
 
----
+### 1. Authentication Endpoints
+**Base URL:** `/api/v1/auth` (Public)
 
-## 1. Authentication Endpoints
-**Base URL:** `/api/v1/auth`
-*These endpoints are public.*
-
-### 📝 Register
+#### 📝 Register
 Create a new user account.
 * **URL:** `/register`
 * **Method:** `POST`
@@ -87,17 +136,8 @@ Create a new user account.
       "password": "securepassword123"
     }
     ```
-* **Response (200 OK):**
-    ```json
-    {
-      "accessToken": "eyJhGciOiJIUzI1Ni...",
-      "refreshToken": "550e8400-e29b-41d4...",
-      "name": "John Doe",
-      "email": "john@example.com"
-    }
-    ```
 
-### 🔑 Login
+#### 🔑 Login
 Authenticate an existing user.
 * **URL:** `/login`
 * **Method:** `POST`
@@ -111,35 +151,21 @@ Authenticate an existing user.
 
 ---
 
-## 2. Admin Commands
+### 2. Admin Commands
 **Base URL:** `/api/admin`
 *Requires Role:* `ADMIN`
 
-### ▶️ Start Robot
-Initiates the robot's patrolling routine.
-* **URL:** `/start`
-* **Method:** `POST`
-* **Response:** `Comanda [START] a fost trimisă!`
-
-### ⏹️ Stop Robot (Emergency)
-Forces the robot to stop immediately.
-* **URL:** `/stop`
-* **Method:** `POST`
-* **Response:** `Robotul a fost OPRIT de urgență!`
-
-### 🏠 Dock Robot
-Sends the robot back to the charging station.
-* **URL:** `/dock`
-* **Method:** `POST`
-* **Response:** `Comanda [DOCK] a fost trimisă!`
+* **Start Robot:** `POST /start`
+* **Stop Robot (Emergency):** `POST /stop`
+* **Dock Robot:** `POST /dock`
 
 ---
 
-## 3. Robot Ingest API
+### 3. Robot Ingest API
 **Base URL:** `/api/robot`
-*These endpoints are used by the TurtleBot (ROS/Python) to push data to the server.*
+*Used by the TurtleBot (ROS/Python) to push data.*
 
-### 📍 Send Telemetry
+#### 📍 Send Telemetry
 Updates the robot's current status, battery, and location.
 * **URL:** `/telemetry`
 * **Method:** `POST`
@@ -153,10 +179,9 @@ Updates the robot's current status, battery, and location.
       "timestamp": "2023-10-27T10:15:30"
     }
     ```
-    * *Supported Statuses:* `PATROLLING`, `ALERT`, `CHARGING`, `DOCKING`.
 
-### 🚨 Send Security Alert
-Triggered when the robot detects an anomaly (e.g., intruder).
+#### 🚨 Send Security Alert
+Triggered when the robot detects an anomaly.
 * **URL:** `/alert`
 * **Method:** `POST`
 * **Body:**
@@ -168,7 +193,6 @@ Triggered when the robot detects an anomaly (e.g., intruder).
       "timestamp": "2023-10-27T10:20:00"
     }
     ```
-    * *Note:* `imageBase64` should contain the raw Base64 string of the snapshot.
 
 ---
 
@@ -184,3 +208,17 @@ Used by the Frontend Dashboard to receive live updates.
 | `/topic/telemetry` | Live robot coordinates & battery | Same as Telemetry JSON |
 | `/topic/alerts` | Incoming security alerts | Same as Alert JSON |
 
+---
+
+## 📂 Project Structure
+
+```bash
+src/main/java/com/example/robot
+├── 🔐 auth/                 # JWT Logic, User Details, Auth Service
+├── ⚙️ config/               # Security and WebSocket Configuration
+├── 🎮 controller/           # REST Controllers
+├── 📦 dto/                  # Data Transfer Objects
+├── 🗃️ model/                # Database Entities (Hibernate)
+├── 💾 repository/           # JPA Interfaces
+└── 🛠️ service/              # Business Logic (Commands, Processing)
+```
