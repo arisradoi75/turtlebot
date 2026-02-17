@@ -1,76 +1,188 @@
-# Robot Security Dashboard - Frontend
+# Robot Security Dashboard (Backend)
 
-A real-time monitoring and control interface built with **React** for a TurtleBot security system. This frontend communicates with a **Spring Boot** backend using REST APIs for authentication/history and WebSockets for live telemetry.
+This is the backend for a **TurtleBot** security and monitoring system. Built using **Java Spring Boot 3**, it serves as the Command and Control (C2) center. It handles user authentication, receives real-time telemetry from the robot, processes security alerts, and sends control commands to the robot.
 
-##  Features
+## Key Features
 
-* **Real-time Telemetry:** Live updates of robot status, battery levels, and coordinates $(X, Y)$ via WebSockets (STOMP/SockJS).
-* **Live Alerts:** Instant notifications with Base64 image snapshots when security events are detected.
-* **Role-Based Access Control (RBAC):** * **User:** Can view live data and historical logs.
-    * **Admin:** Full access to the Control Panel (Start, Stop, and Dock commands).
-* **Authentication:** Secure JWT-based login and registration system.
-* **Historical Data:** Fetches the last known robot state and previous alerts from the database upon login.
-* **Responsive Design:** Clean, organized layout with separate sections for Live Data, Control, and Database History.
+### 1. Security & Authentication
+* **JWT (JSON Web Tokens):** Complete system for login, registration, and token validation.
+* **Refresh Tokens:** Mechanism to maintain active sessions without frequent re-logins.
+* **RBAC (Role-Based Access Control):**
+  * `USER`: Can view telemetry data and alerts.
+  * `ADMIN`: Has full control over the robot (Start, Stop, Dock).
 
-##  Tech Stack
+### 2. Real-time Monitoring (WebSocket)
+* Uses **WebSocket (STOMP)** to push data to the Dashboard instantly.
+* **Telemetry:** Position (X, Y), battery level, and current status.
+* **Alerts:** Instant notifications including images (Base64) when intruders are detected.
 
-* **Framework:** React (Vite)
-* **State Management:** React Hooks (`useState`, `useEffect`, `useRef`)
-* **Routing:** React Router v6
-* **Networking:** Axios (with Interceptors for JWT)
-* **Real-time Communication:** SockJS-client & StompJS
-* **Security:** JWT Decoding (`jwt-decode`)
+### 3. Robot Integration
+* **Ingest API:** REST endpoints optimized to receive data from the robot's Python/ROS scripts.
+* **Command Service:** Sends HTTP commands to the robot's internal API (`http://172.20.10.12:5000`).
+* **Battery Monitoring:** Automatically generates internal alerts if the battery drops below 15%.
 
-##  Prerequisites
+---
 
-Before running this application, ensure you have:
-* [Node.js](https://nodejs.org/) (v16 or higher)
-* The Spring Boot Backend server running on `http://localhost:8080`
+## Tech Stack
 
-##  Installation & Setup
+| Category | Technology |
+| :--- | :--- |
+| **Language** | Java 17+ |
+| **Framework** | Spring Boot 3.x |
+| **Database** | MySQL (Spring Data JPA) |
+| **Security** | Spring Security 6, JJWT |
+| **Real-time** | Spring WebSocket (STOMP) |
+| **Tools** | Maven, Lombok |
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/your-username/robot-dashboard.git](https://github.com/your-username/robot-dashboard.git)
-    cd robot-dashboard
+---
+
+## Installation and Setup
+
+### 1. Prerequisites
+* JDK 17 or newer
+* MySQL Server
+* Maven
+
+### 2. Database Configuration
+Create an empty database named `robot_db`. Then, configure `src/main/resources/application.properties`:
+
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/robot_db
+spring.datasource.username=root
+spring.datasource.password=your_password
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+# JWT Secret (Change this in production!)
+application.security.jwt.secret-key=BF7FD11ACE545745B7BA1AF98B6F156D127BC7BB544BAB6A4FD74E4FC7
+```
+
+### 3. Robot IP Configuration
+ **Important:** The robot's IP address is currently hardcoded in `CommandService.java`.
+Check the following line before running:
+```java
+private final String ROBOT_API_URL = "[http://172.20.10.12:5000/api/command](http://172.20.10.12:5000/api/command)";
+```
+If your robot has a different IP on the local network, update this string.
+
+### 4. Running the App
+```bash
+mvn clean install
+mvn spring-boot:run
+```
+
+---
+
+##  API Documentation
+
+The backend exposes a RESTful API reachable at `http://localhost:8080`.
+
+###  Authentication & Authorization
+Most endpoints require a valid **JWT Token** in the HTTP Header.
+* **Header Format:** `Authorization: Bearer <your_access_token>`
+* **Roles:**
+    * `USER`: Read-only access (Telemetry, Alerts).
+    * `ADMIN`: Write access (Robot Commands).
+
+### 1. Authentication Endpoints
+**Base URL:** `/api/v1/auth` (Public)
+
+#### Register
+Create a new user account.
+* **URL:** `/register`
+* **Method:** `POST`
+* **Body:**
+    ```json
+    {
+      "name": "John Doe",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "password": "securepassword123"
+    }
     ```
 
-2.  **Install dependencies:**
-    ```bash
-    npm install
+#### Login
+Authenticate an existing user.
+* **URL:** `/login`
+* **Method:** `POST`
+* **Body:**
+    ```json
+    {
+      "email": "john@example.com",
+      "password": "securepassword123"
+    }
     ```
 
-3.  **Configuration:**
-    Open `src/services/api.js` and verify the `API_URL`:
-    ```javascript
-    const API_URL = 'http://localhost:8080/api';
+---
+
+### 2. Admin Commands
+**Base URL:** `/api/admin`
+*Requires Role:* `ADMIN`
+
+* **Start Robot:** `POST /start`
+* **Stop Robot (Emergency):** `POST /stop`
+* **Dock Robot:** `POST /dock`
+
+---
+
+### 3. Robot Ingest API
+**Base URL:** `/api/robot`
+*Used by the TurtleBot (ROS/Python) to push data.*
+
+#### Send Telemetry
+Updates the robot's current status, battery, and location.
+* **URL:** `/telemetry`
+* **Method:** `POST`
+* **Body:**
+    ```json
+    {
+      "x": 12.5,
+      "y": -4.3,
+      "batteryLevel": 88.5,
+      "status": "PATROLLING",
+      "timestamp": "2023-10-27T10:15:30"
+    }
     ```
 
-4.  **Run the development server:**
-    ```bash
-    npm run dev
+#### Send Security Alert
+Triggered when the robot detects an anomaly.
+* **URL:** `/alert`
+* **Method:** `POST`
+* **Body:**
+    ```json
+    {
+      "alertType": "INTRUDER_DETECTED",
+      "message": "Motion detected in Sector 4",
+      "imageBase64": "iVBORw0KGgoAAAANSUhEUgAA...", 
+      "timestamp": "2023-10-27T10:20:00"
+    }
     ```
 
-##  API & WebSocket Integration
+---
 
-| Connection Type | Endpoint | Description |
+## WebSocket API (Real-time)
+Used by the Frontend Dashboard to receive live updates.
+
+* **Connection Endpoint:** `ws://localhost:8080/ws-robot`
+* **Protocol:** STOMP over SockJS
+
+### Subscribe Topics
+| Topic | Description | Payload Structure |
 | :--- | :--- | :--- |
-| **REST** | `/api/v1/auth/*` | Login & Registration |
-| **REST** | `/api/robot/latest-telemetry` | Get last saved status from DB |
-| **REST** | `/api/admin/{command}` | Send commands (Admin only) |
-| **WebSocket** | `/ws-robot` | Connection endpoint |
-| **Topic** | `/topic/telemetry` | Live robot status updates |
-| **Topic** | `/topic/alerts` | Live security alerts with snapshots |
+| `/topic/telemetry` | Live robot coordinates & battery | Same as Telemetry JSON |
+| `/topic/alerts` | Incoming security alerts | Same as Alert JSON |
 
-##  Project Structure
+---
 
-```text
-src/
-├── services/
-│   └── api.js       # Axios instance with JWT interceptors
-├── pages/
-│   ├── Login.jsx     # Auth page with role extraction
-│   ├── Register.jsx  # User registration
-│   └── Dashboard.jsx # Main monitoring hub (WS & REST)
-├── App.jsx           # Routing configuration
-└── main.jsx          # Entry point & Global Polyfills
+## Project Structure
+
+```bash
+src/main/java/com/example/robot
+├──  auth/                 # JWT Logic, User Details, Auth Service
+├──  config/               # Security and WebSocket Configuration
+├──  controller/           # REST Controllers
+├──  dto/                  # Data Transfer Objects
+├──  model/                # Database Entities (Hibernate)
+├──  repository/           # JPA Interfaces
+└──  service/              # Business Logic (Commands, Processing)
+```
