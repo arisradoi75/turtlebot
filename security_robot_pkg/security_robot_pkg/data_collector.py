@@ -21,6 +21,8 @@ class DataCollector(Node):
         
         # Create dataset directory if it doesn't exist
         self.save_dir = "dataset_robot"
+        # Use absolute path to ensure it saves in Home regardless of where you run the script
+        self.save_dir = os.path.join(os.path.expanduser("~"), "dataset_robot")
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
             
