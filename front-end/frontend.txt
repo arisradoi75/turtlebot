@@ -1,3 +1,209 @@
+// File: /Users/arisradoi/Desktop/turtlebot/front-end/robot-dashboard/src/pages/Login.jsx
+import React, { useState } from 'react';
+import api from '../services/api';
+import { jwtDecode } from 'jwt-decode'; // Importăm decodorul
+import { useNavigate, Link } from 'react-router-dom';
+
+const Login = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const navigate = useNavigate();
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        try {
+            // Trimitem cererea conform clasei LoginRequest din Java [cite: 198]
+            const response = await api.post('/v1/auth/login', {
+                email,
+                password
+            });
+
+            // Salvăm token-ul primit
+            const { accessToken, refreshToken, name } = response.data;
+            localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('refreshToken', refreshToken);
+            localStorage.setItem('userName', name);
+
+            // Decodăm token-ul pentru a extrage rolul
+            const decodedToken = jwtDecode(accessToken);
+            // Backend-ul adaugă rolul ca o listă de autorități. Extragem prima autoritate.
+            const userRole = decodedToken.role[0].authority;
+            localStorage.setItem('userRole', userRole);
+            
+            // Redirecționăm către Dashboard
+            navigate('/dashboard');
+        } catch (error) {
+            let errorMessage = 'Autentificare eșuată!';
+            if (error.response) {
+                // Serverul a răspuns cu o eroare (ex: 401, 403)
+                console.error('Server Response:', error.response.data);
+                errorMessage += ` Detalii: ${error.response.data.message || 'Verifică email/parola.'}`;
+            } else if (error.request) {
+                // Cererea a fost făcută dar nu s-a primit răspuns (posibil CORS sau server oprit)
+                console.error('No response received:', error.request);
+                errorMessage = 'Eroare de rețea. Serverul nu răspunde. Verifică dacă backend-ul este pornit și configurația CORS.';
+            } else {
+                console.error('Error setting up request:', error.message);
+                errorMessage = 'A apărut o eroare neașteptată la configurarea cererii.';
+            }
+            alert(errorMessage);
+        }
+    };
+
+    return (
+        <div style={{ padding: '2rem' }}>
+            <h2>Login Robot Security</h2>
+            <form onSubmit={handleLogin}>
+                <div>
+                    <label>Email:</label>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
+                <div>
+                    <label>Parola:</label>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                </div>
+                <button type="submit">Logare</button>
+            </form>
+            <p style={{ marginTop: '1rem' }}>
+                Nu ai cont? <Link to="/register">Înregistrează-te aici</Link>
+            </p>
+        </div>
+    );
+};
+
+export default Login;
+
+// File: /Users/arisradoi/Desktop/turtlebot/front-end/robot-dashboard/src/pages/Register.jsx
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import api from '../services/api';
+
+const Register = () => {
+    const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const navigate = useNavigate();
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        try {
+            // Presupunem că endpoint-ul de register este /api/v1/auth/register
+            await api.post('/v1/auth/register', {
+                name,
+                username,
+                email,
+                password,
+            });
+
+            alert('Înregistrare reușită! Vă puteți autentifica acum.');
+            navigate('/'); // Redirecționare către pagina de login
+        } catch (error) {
+            let errorMessage = 'Înregistrarea a eșuat!';
+            if (error.response) {
+                // Serverul a răspuns cu o eroare (ex: 409 Conflict)
+                console.error('Server Response:', error.response.data);
+                errorMessage += ` Detalii: ${error.response.data.message || 'Email-ul poate fi deja folosit sau datele sunt invalide.'}`;
+            } else if (error.request) {
+                // Cererea a fost făcută dar nu s-a primit răspuns
+                console.error('No response received:', error.request);
+                errorMessage = 'Eroare de rețea. Serverul nu răspunde. Verifică dacă backend-ul este pornit și configurația CORS.';
+            } else {
+                console.error('Error setting up request:', error.message);
+                errorMessage = 'A apărut o eroare neașteptată la înregistrare.';
+            }
+            alert(errorMessage);
+        }
+    };
+
+    return (
+        <div style={{ padding: '2rem' }}>
+            <h2>Înregistrare Utilizator Nou</h2>
+            <form onSubmit={handleRegister}>
+                <div><label>Nume:</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+                <div><label>Utilizator:</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required /></div>
+                <div><label>Email:</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+                <div><label>Parola:</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
+                <button type="submit">Înregistrare</button>
+            </form>
+            <p style={{ marginTop: '1rem' }}>
+                Aveți deja cont? <Link to="/">Autentificați-vă</Link>
+            </p>
+        </div>
+    );
+};
+
+export default Register;
+
+// File: /Users/arisradoi/Desktop/turtlebot/front-end/robot-dashboard/src/main.jsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+
+// FIX: Polyfill pentru 'global' necesar pentru stompjs.
+// Îl punem aici pentru a fi siguri că rulează înainte de orice altceva.
+if (typeof global === 'undefined') {
+  window.global = window;
+}
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+// File: /Users/arisradoi/Desktop/turtlebot/front-end/robot-dashboard/src/services/api.js
+import axios from 'axios';
+
+// URL-ul backend-ului tău Spring Boot
+const API_URL = 'http://localhost:8080/api'; 
+
+const api = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Interceptor: Adaugă token-ul la fiecare cerere dacă suntem logați
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+            // Backend-ul așteaptă "Bearer " + token [cite: 111]
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+export default api;
+
+// File: /Users/arisradoi/Desktop/turtlebot/front-end/robot-dashboard/src/App.jsx
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Register from './pages/Register';
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
+
+// File: /Users/arisradoi/Desktop/turtlebot/front-end/robot-dashboard/src/pages/Dashboard.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -7,8 +213,6 @@ const Dashboard = () => {
     const [dbRobotData, setDbRobotData] = useState(null);     // Date încărcate din Baza de Date
     const [liveAlerts, setLiveAlerts] = useState([]);         // Alerte LIVE prin WebSocket
     const [dbAlert, setDbAlert] = useState(null);             // Ultima alertă din Baza de Date
-    const [cameraError, setCameraError] = useState(false);    // Stare eroare cameră
-    const [showCamera, setShowCamera] = useState(false);      // Stare vizibilitate cameră
     const stompClientRef = useRef(null); // Referință pentru clientul WebSocket
     // Inițializăm state-ul direct din localStorage pentru a evita re-randări inutile
     const [userInfo] = useState(() => {
@@ -17,10 +221,6 @@ const Dashboard = () => {
         return { name, role };
     });
     const navigate = useNavigate();
-
-    // Configurare URL Stream Camera (web_video_server)
-    const LINUX_IP = '172.20.10.12'; // <--- Pune aici IP-ul mașinii cu Gazebo/ROS dacă nu e localhost
-    const STREAM_URL = `http://${LINUX_IP}:8080/stream?topic=/camera/image_ai&type=mjpeg`;
 
     // Verificăm dacă userul e logat la încărcare
     useEffect(() => {
@@ -102,62 +302,10 @@ const Dashboard = () => {
             await api.post(`/admin/${command}`);
             alert(`Comanda ${command.toUpperCase()} trimisă!`);
         } catch (error) {
-            console.error("Eroare comandă:", error);
-            let msg = "Eroare la trimiterea comenzii.";
-            
-            if (error.response) {
-                // Backend-ul a răspuns cu un cod de eroare (ex: 500, 403)
-                msg += ` (Status: ${error.response.status})`;
-                // Încercăm să extragem mesajul specific din backend
-                const data = error.response.data;
-                if (typeof data === 'string') msg += `\nDetalii: ${data}`;
-                else if (data?.message) msg += `\nDetalii: ${data.message}`;
-                else if (data?.error) msg += `\nEroare: ${data.error}`;
-            } else {
-                msg += "\nVerifică conexiunea cu serverul backend.";
-            }
-            alert(msg);
+            console.error(error);
+            alert('Eroare la trimiterea comenzii (Ești ADMIN?).');
         }
     };
-
-    // Funcție pentru JOG (Control Manual WASD) - Doar în stare ALERT
-    // const handleJog = async (direction) => {
-    //     // Verificăm preliminar în frontend dacă robotul e în ALERT pentru a evita request-uri inutile
-    //     // Totuși, backend-ul face verificarea finală de securitate.
-    //     if (liveRobotData?.status !== 'ALERT') {
-    //         console.warn("Controlul manual este permis doar în starea ALERT.");
-    //         return;
-    //     }
-
-    //     try {
-    //         await api.post(`/admin/jog/${direction}`);
-    //         console.log(`JOG ${direction} trimis.`);
-    //     } catch (error) {
-    //         console.error("Eroare JOG:", error.response?.data || error.message);
-    //     }
-    // };
-
-    // Ascultător pentru tastele WASD
-    // useEffect(() => {
-    //     const handleKeyDown = (e) => {
-    //         // Activăm doar dacă userul e ADMIN și nu scrie într-un input
-    //         if (userInfo.role === 'ADMIN' && e.target.tagName !== 'INPUT') {
-    //             let key = e.key.toLowerCase();
-
-    //             // Mapare taste săgeți la WASD pentru a evita erorile 400
-    //             if (key === 'arrowup') key = 'w';
-    //             if (key === 'arrowdown') key = 's';
-    //             if (key === 'arrowleft') key = 'a';
-    //             if (key === 'arrowright') key = 'd';
-
-    //             if (['w', 'a', 's', 'd'].includes(key)) {
-    //                 handleJog(key);
-    //             }
-    //         }
-    //     };
-    //     window.addEventListener('keydown', handleKeyDown);
-    //     return () => window.removeEventListener('keydown', handleKeyDown);
-    // }, [userInfo, liveRobotData]); // Re-atașăm listener-ul dacă se schimbă datele
 
     // Helper pentru formatarea datei (suportă și formatul array din Java)
     const formatTime = (ts) => {
@@ -187,63 +335,9 @@ const Dashboard = () => {
                 localStorage.clear();
                 navigate('/');
             }}>Logout</button>
-            
-            <button onClick={() => setShowCamera(!showCamera)} style={{ marginLeft: '10px' }}>
-                Robot POV
-            </button>
 
             {/* ==== ZONA 1: LIVE & CONTROL (Orizontal) ==== */}
             <div style={{ display: 'flex', gap: '20px', marginTop: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                
-                {/* ==== SECȚIUNE CAMERA LIVE (POV) ==== */}
-                {showCamera && (
-                    <div style={{ 
-                    border: '1px solid #333', 
-                    padding: '10px', 
-                    width: '320px', 
-                    background: '#000', 
-                    color: '#fff', 
-                    textAlign: 'center' 
-                }}>
-                    <h2 style={{ color: '#fff' }}>Live POV</h2>
-                    {!cameraError ? (
-                        <img 
-                            src={STREAM_URL} 
-                            alt="Robot Camera Stream" 
-                            style={{ width: '100%', borderRadius: '4px', minHeight: '200px', background: '#222' }} 
-                            onError={() => setCameraError(true)}
-                        />
-                    ) : (
-                        <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#222' }}>
-                            <p style={{ color: '#ff4444' }}>Offline / Conexiune eșuată</p>
-                            <button onClick={() => setCameraError(false)} style={{ marginTop: '10px', cursor: 'pointer' }}>Reîncearcă</button>
-                        </div>
-                    )}
-
-                    {/* Control Manual WASD (Doar Admin) */}
-                    {/* {userInfo.role === 'ADMIN' && (
-                        <div style={{ marginTop: '15px', borderTop: '1px solid #555', paddingTop: '10px' }}>
-                            <h3 style={{ fontSize: '1rem', marginBottom: '10px', color: liveRobotData?.status === 'ALERT' ? '#ff4444' : '#777' }}>
-                                Control Manual {liveRobotData?.status === 'ALERT' ? '(ACTIV)' : '(Inactiv - Necesită ALERT)'}
-                            </h3>
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-                                <button 
-                                    onMouseDown={() => handleJog('w')} 
-                                    style={{ width: '40px', height: '40px', fontWeight: 'bold', background: liveRobotData?.status === 'ALERT' ? '#444' : '#222', color: 'white', border: '1px solid #555', cursor: liveRobotData?.status === 'ALERT' ? 'pointer' : 'not-allowed' }}
-                                >W</button>
-                                
-                                <div style={{ display: 'flex', gap: '5px' }}>
-                                    {['a', 's', 'd'].map((key) => (
-                                        <button key={key} onMouseDown={() => handleJog(key)} style={{ width: '40px', height: '40px', fontWeight: 'bold', background: liveRobotData?.status === 'ALERT' ? '#444' : '#222', color: 'white', border: '1px solid #555', cursor: liveRobotData?.status === 'ALERT' ? 'pointer' : 'not-allowed' }}>{key.toUpperCase()}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )} */}
-                    </div>
-                )}
-
                 {/* ==== SECȚIUNE LIVE (WebSocket) ==== */}
                 <div style={{ border: '1px solid #ccc', padding: '10px', width: '300px' }}>
                     <h2>Status Robot (Live)</h2>

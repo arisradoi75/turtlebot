@@ -14,7 +14,8 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('accessToken');
-        if (token) {
+        // Nu trimitem token-ul pentru rutele de auth (login/register) pentru a evita erori 403 dacă token-ul e expirat
+        if (token && !config.url.includes('/auth/login') && !config.url.includes('/auth/register')) {
             // Backend-ul așteaptă "Bearer " + token [cite: 111]
             config.headers.Authorization = `Bearer ${token}`;
         }

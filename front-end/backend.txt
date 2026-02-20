@@ -1,43 +1,296 @@
+// =================================================================================
+// PACHET: com.example.robot.model
+// =================================================================================
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Robot.java
+package com.example.robot.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "robot_telemetry")
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Data
+public class Robot {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private double x;
+    private double y;
+    private double batteryLevel;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 25)
+    private RobotStatus status;
+    private LocalDateTime timestamp;
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/RobotStatus.java
+package com.example.robot.model;
+
+public enum RobotStatus {
+    PATROLLING,
+    ALERT,
+    CHARGING,
+    DOCKING
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Alert.java
+package com.example.robot.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Entity
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@Data
+@Table(name = "security_alert")
+public class Alert {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String alertType;
+    @Column(length = 500)
+    private String message;
+    private LocalDateTime timestamp;
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String snapshotBase64;
+    private String status;
+}
+
+// =================================================================================
+// PACHET: com.example.robot.dto
+// =================================================================================
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/RobotStatusDTO.java
+package com.example.robot.dto;
+
+import lombok.Data;
+
+@Data
+public class RobotStatusDTO {
+    private double x;
+    private double y;
+    private double batteryLevel;
+    private String status;
+    private String timestamp;
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/AlertDTO.java
+package com.example.robot.dto;
+
+import lombok.Data;
+
+@Data
+public class AlertDTO {
+    private String alertType;
+    private String message;
+    private String imageBase64;
+    private String timestamp;
+    private String status;
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/MoveRequestDTO.java
+package com.example.robot.dto;
+
+import lombok.Data;
+
+@Data
+public class MoveRequestDTO {
+    private double x;
+    private double y;
+}
+
+// =================================================================================
+// PACHET: com.example.robot.repository
+// =================================================================================
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/repository/RobotRepository.java
+package com.example.robot.repository;
+
+import com.example.robot.model.Robot;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface RobotRepository extends JpaRepository<Robot, Long> {
+    Optional<Robot> findTopByOrderByTimestampDesc();
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/repository/AlertRepository.java
+package com.example.robot.repository;
+
+import com.example.robot.model.Alert;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+import java.util.Optional;
+
+public interface AlertRepository extends JpaRepository<Alert, Long> {
+    List<Alert> findByStatus(String status);
+    Optional<Alert> findTopByOrderByTimestampDesc();
+}
+
+// =================================================================================
+// PACHET: com.example.robot.service
+// =================================================================================
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/RobotService.java
+package com.example.robot.service;
+
+import com.example.robot.dto.RobotStatusDTO;
+import com.example.robot.model.Robot;
+import com.example.robot.model.RobotStatus;
+import com.example.robot.repository.RobotRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class RobotService {
+    private final RobotRepository robotRepository;
+    private final AlertService alertService;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    public void processTelemetry(RobotStatusDTO dto) {
+        Robot robot = new Robot();
+        robot.setX(dto.getX());
+        robot.setY(dto.getY());
+        robot.setBatteryLevel(dto.getBatteryLevel());
+        try {
+            if (dto.getStatus() != null) {
+                robot.setStatus(RobotStatus.valueOf(dto.getStatus().toUpperCase()));
+            } else {
+                robot.setStatus(RobotStatus.ALERT);
+            }
+        } catch (IllegalArgumentException e) {
+            System.err.println("Status necunoscut primit: " + dto.getStatus());
+            robot.setStatus(RobotStatus.ALERT);
+        }
+        if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
+            try {
+                robot.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
+            } catch (Exception e) {
+                robot.setTimestamp(LocalDateTime.now());
+            }
+        } else {
+            robot.setTimestamp(LocalDateTime.now());
+        }
+        if (robot.getBatteryLevel() < 15.0 && robot.getStatus() != RobotStatus.CHARGING) {
+            alertService.createInternalAlert("LOW_BATTERY", "Bateria robotului este critică (" + robot.getBatteryLevel() + "%) și nu încarcă!");
+        }
+        robotRepository.save(robot);
+        messagingTemplate.convertAndSend("/topic/telemetry", robot);
+    }
+
+    public Robot getLatestTelemetry() {
+        return robotRepository.findTopByOrderByTimestampDesc().orElse(null);
+    }
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/AlertService.java
+package com.example.robot.service;
+
+import com.example.robot.dto.AlertDTO;
+import com.example.robot.model.Alert;
+import com.example.robot.repository.AlertRepository;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+
+@Service
+public class AlertService {
+    private final AlertRepository alertRepository;
+    private final SimpMessagingTemplate simpMessagingTemplate;
+
+    public AlertService(AlertRepository alertRepository, SimpMessagingTemplate simpMessagingTemplate) {
+        this.alertRepository = alertRepository;
+        this.simpMessagingTemplate = simpMessagingTemplate;
+    }
+
+    public void processAlertFromRobot(AlertDTO dto) {
+        Alert alert = new Alert();
+        alert.setAlertType(dto.getAlertType());
+        alert.setMessage(dto.getMessage());
+        alert.setSnapshotBase64(dto.getImageBase64());
+        if (dto.getStatus() != null && !dto.getStatus().isEmpty()) {
+            alert.setStatus(dto.getStatus().toUpperCase());
+        } else {
+            alert.setStatus("NEW");
+        }
+        if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
+            try {
+                alert.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
+            } catch (Exception e) {
+                alert.setTimestamp(LocalDateTime.now());
+            }
+        } else {
+            alert.setTimestamp(LocalDateTime.now());
+        }
+        saveAndBroadcast(alert);
+    }
+
+    public void createInternalAlert(String type, String message) {
+        Alert alert = Alert.builder().alertType(type).message(message).status("NEW").timestamp(LocalDateTime.now()).build();
+        saveAndBroadcast(alert);
+    }
+
+    private void saveAndBroadcast(Alert alert) {
+        Alert savedAlert = alertRepository.save(alert);
+        simpMessagingTemplate.convertAndSend("/topic/alerts", savedAlert);
+        System.out.println("🚨 ALERTA SALVATĂ: " + alert.getAlertType() + " - " + alert.getMessage());
+    }
+
+    public Alert getLatestAlert() {
+        return alertRepository.findTopByOrderByTimestampDesc().orElse(null);
+    }
+}
+
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/CommandService.java
 package com.example.robot.service;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class CommandService {
     private final String ROBOT_API_URL = "http://172.20.10.12:5000/api/command";
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // O clasă internă simplă pentru a structura JSON-ul
-    @Data
-    @AllArgsConstructor
-    private static class CommandPayload {
-        private String command;
+    public void sendCommand(String command) {
+        sendCommand(command, null);
     }
 
-    public void sendCommand(String command) {
+    public void sendCommand(String command, Map<String, Object> data) {
         try {
-            // 1. Creăm payload-ul
-            CommandPayload payload = new CommandPayload(command);
-
-            // 2. Setăm headerele pentru a specifica faptul că trimitem JSON
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("command", command);
+            if (data != null && !data.isEmpty()) {
+                payload.put("data", data);
+            }
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-
-            // 3. Împachetăm payload-ul și headerele într-o entitate HTTP
-            HttpEntity<CommandPayload> request = new HttpEntity<>(payload, headers);
-
-            // 4. Trimitem cererea POST
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
             restTemplate.postForObject(ROBOT_API_URL, request, String.class);
-
             System.out.println("Comandă JSON trimisă către Robot: " + payload);
-
         } catch (Exception e) {
             System.err.println("Eroare: Robotul nu răspunde! " + e.getMessage());
             throw new RuntimeException("Robot offline sau IP greșit!");
@@ -45,13 +298,67 @@ public class CommandService {
     }
 }
 
+// =================================================================================
+// PACHET: com.example.robot.controller
+// =================================================================================
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/controller/RobotController.java
+package com.example.robot.controller;
+
+import com.example.robot.dto.AlertDTO;
+import com.example.robot.dto.RobotStatusDTO;
+import com.example.robot.model.Alert;
+import com.example.robot.model.Robot;
+import com.example.robot.service.AlertService;
+import com.example.robot.service.RobotService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/robot")
+@CrossOrigin(origins = "*")
+public class RobotController {
+    private final RobotService robotService;
+    private final AlertService alertService;
+
+    public RobotController(RobotService robotService, AlertService alertService) {
+        this.robotService = robotService;
+        this.alertService = alertService;
+    }
+
+    @PostMapping("/telemetry")
+    public ResponseEntity<String> reciveTelemetry(@RequestBody RobotStatusDTO dto) {
+        robotService.processTelemetry(dto);
+        return ResponseEntity.ok("UPDATE!");
+    }
+
+    @PostMapping("/alert")
+    public ResponseEntity<String> reciveAlert(@RequestBody AlertDTO dto) {
+        alertService.processAlertFromRobot(dto);
+        return ResponseEntity.ok("Alert saved!");
+    }
+
+    @GetMapping("/latest-telemetry")
+    public ResponseEntity<Robot> getLatestTelemetry() {
+        return ResponseEntity.ok(robotService.getLatestTelemetry());
+    }
+
+    @GetMapping("/latest-alert")
+    public ResponseEntity<Alert> getLatestAlert() {
+        return ResponseEntity.ok(alertService.getLatestAlert());
+    }
+}
+
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/controller/AdminController.java
 package com.example.robot.controller;
 
+import com.example.robot.dto.MoveRequestDTO;
 import com.example.robot.service.CommandService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -70,140 +377,34 @@ public class AdminController {
         return ResponseEntity.ok("Comanda [DOCK] a fost trimisă!");
     }
 
-    @PostMapping("/start")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/start")
     public ResponseEntity<String> startRobot() {
         commandService.sendCommand("START");
         return ResponseEntity.ok("Comanda [START] a fost trimisă!");
     }
 
-    @PostMapping("/stop")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/stop")
     public ResponseEntity<String> stopRobot() {
         commandService.sendCommand("STOP");
         return ResponseEntity.ok("Robotul a fost OPRIT de urgență!");
     }
-}
 
-// ... (restul fișierelor pe care le-am citit anterior și le voi adăuga aici pentru a reface complet fișierul) ...
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Robot.java
-package com.example.robot.model;
-
-
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "robot_telemetry")
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@Data
-public class Robot {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    private double x;
-    private double y;
-    private double batteryLevel;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 25)
-    private RobotStatus status;
-
-    private LocalDateTime timestamp;
-
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/RobotStatus.java
-package com.example.robot.model;
-
-public enum RobotStatus {
-    PATROLLING,
-    ALERT,
-    CHARGING,
-    DOCKING
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/RobotStatusDTO.java
-package com.example.robot.dto;
-
-import lombok.Data;
-
-@Data
-public class RobotStatusDTO {
-    private double x;
-    private double y;
-    private double batteryLevel;
-    private String status;
-    private String timestamp;
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/RobotService.java
-package com.example.robot.service;
-
-import com.example.robot.dto.RobotStatusDTO;
-import com.example.robot.model.Robot;
-import com.example.robot.model.RobotStatus;
-import com.example.robot.repository.RobotRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-
-@Service
-@RequiredArgsConstructor
-public class RobotService {
-    private final RobotRepository robotRepository;
-    private final AlertService alertService; // Injectăm AlertService pentru a semnala probleme
-    private final SimpMessagingTemplate messagingTemplate;
-
-    public void processTelemetry(RobotStatusDTO dto) {
-        Robot robot = new Robot();
-
-        robot.setX(dto.getX());
-        robot.setY(dto.getY());
-        robot.setBatteryLevel(dto.getBatteryLevel());
-
-        try {
-            if (dto.getStatus() != null) {
-                robot.setStatus(RobotStatus.valueOf(dto.getStatus().toUpperCase()));
-            } else {
-                robot.setStatus(RobotStatus.ALERT);
-            }
-        } catch (IllegalArgumentException e) {
-            System.err.println("Status necunoscut primit: " + dto.getStatus());
-            robot.setStatus(RobotStatus.ALERT);
-        }
-
-        if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
-            try {
-                robot.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
-            } catch (Exception e) {
-                robot.setTimestamp(LocalDateTime.now());
-            }
-        } else {
-            robot.setTimestamp(LocalDateTime.now());
-        }
-
-        if (robot.getBatteryLevel() < 15.0 && robot.getStatus() != RobotStatus.CHARGING) {
-            alertService.createInternalAlert("LOW_BATTERY",
-                    "Bateria robotului este critică (" + robot.getBatteryLevel() + "%) și nu încarcă!");
-        }
-
-        robotRepository.save(robot);
-        messagingTemplate.convertAndSend("/topic/telemetry", robot);
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/move")
+    public ResponseEntity<String> moveToCoordinates(@RequestBody MoveRequestDTO moveRequest) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("x", moveRequest.getX());
+        data.put("y", moveRequest.getY());
+        commandService.sendCommand("MOVE", data);
+        return ResponseEntity.ok("Comanda [MOVE] a fost trimisă cu coordonatele: " + moveRequest);
     }
 }
+
+// =================================================================================
+// PACHET: com.example.robot.auth
+// =================================================================================
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/entities/User.java
 package com.example.robot.auth.entities;
@@ -217,7 +418,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
 import java.util.Collection;
 import java.util.List;
 
@@ -228,25 +428,18 @@ import java.util.List;
 @Getter
 @Builder
 public class User implements UserDetails {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer userId;
-
     private String name;
-
     @Column(unique = true)
     private String username;
-
     @Column(unique = true)
     @Email(message = "exemple123@exemple.com")
     private String email;
-
     private String password;
-
     @OneToOne(mappedBy = "user")
     private RefreshToken refreshToken;
-
     @Enumerated(EnumType.STRING)
     private TypeUser type;
 
@@ -302,7 +495,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
 import java.time.Instant;
 
 @Entity
@@ -314,109 +506,34 @@ public class RefreshToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer tokenId;
-
-    @Column(nullable = false , length = 500)
+    @Column(nullable = false, length = 500)
     private String refreshToken;
-
     @Column(nullable = false)
     private Instant expirationTime;
-
     @OneToOne
     private User user;
-
-
-
 }
 
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/services/JwtService.java
-package com.example.robot.auth.services;
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/repositories/UserRepository.java
+package com.example.robot.auth.repositories;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Service;
+import com.example.robot.auth.entities.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
 
-import java.security.Key;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
+public interface UserRepository extends JpaRepository<User, Integer> {
+    Optional<User> findByEmail(String username);
+}
 
-// @Service marchează clasa ca fiind un serviciu Spring.
-@Service
-public class JwtService {
-    // Cheia secretă folosită pentru semnarea token-urilor JWT. Ar trebui să fie păstrată în siguranță (ex: variabile de mediu).
-    private static final String SECRET_KEY = "BF7FD11ACE545745B7BA1AF98B6F156D127BC7BB544BAB6A4FD74E4FC7";
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/repositories/RefreshTokenRepository.java
+package com.example.robot.auth.repositories;
 
-    // Extrage username-ul (subiectul) din token-ul JWT.
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
+import com.example.robot.auth.entities.RefreshToken;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
 
-    // Metodă generică pentru extragerea unei anumite informații (claim) din token.
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    // Extrage toate informațiile (claims) din token-ul JWT.
-    private Claims extractAllClaims(String token) {
-        return Jwts
-                .parserBuilder()
-                .setSigningKey(getSignInKey()) // Setează cheia de semnare pentru verificare.
-                .build()
-                .parseClaimsJws(token) // Parsează token-ul.
-                .getBody(); // Returnează corpul token-ului (payload).
-    }
-
-    // Decodifică cheia secretă din format Base64 și returnează un obiect Key.
-    private Key getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    // Generează un token JWT pentru un utilizator, fără claim-uri extra.
-    public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
-    }
-
-    // Generează un token JWT cu claim-uri extra și detaliile utilizatorului.
-    public String generateToken(
-            Map<String, Object> extraClaims,
-            UserDetails userDetails
-    ) {
-        extraClaims = new HashMap<>(extraClaims);
-        // Adaugă rolurile utilizatorului în claim-uri.
-        extraClaims.put("role", userDetails.getAuthorities());
-        return Jwts
-                .builder()
-                .setClaims(extraClaims) // Setează claim-urile.
-                .setSubject(userDetails.getUsername()) // Setează subiectul (username-ul).
-                .setIssuedAt(new Date(System.currentTimeMillis())) // Setează data emiterii.
-                .setExpiration(new Date(System.currentTimeMillis() + 25 * 100000)) // Setează data expirării.
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256) // Semnează token-ul cu cheia secretă și algoritmul HS256.
-                .compact(); // Construiește token-ul string.
-    }
-
-    // Verifică dacă un token este valid pentru un anumit utilizator.
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        // Token-ul este valid dacă username-ul corespunde și token-ul nu este expirat.
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
-    }
-
-    // Verifică dacă token-ul este expirat.
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    // Extrage data expirării din token.
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Integer> {
+    Optional<RefreshToken> findByRefreshToken(String refreshToken);
 }
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/services/AuthService.java
@@ -435,81 +552,134 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-
-// @Service indică faptul că această clasă este un serviciu Spring (componentă de business logic).
 @Service
-// @RequiredArgsConstructor generează un constructor cu argumente pentru toate câmpurile finale (final).
 @RequiredArgsConstructor
 public class AuthService {
-
-    // Encoder pentru criptarea parolelor.
     private final PasswordEncoder passwordEncoder;
-    // Repository pentru accesul la datele utilizatorilor.
     private final UserRepository userRepository;
-    // Serviciu pentru generarea token-urilor JWT.
     private final JwtService jwtService;
-    // Serviciu pentru gestionarea refresh token-urilor.
     private final RefreshTokenService refreshTokenService;
-    // Managerul de autentificare Spring Security.
     private final AuthenticationManager authenticationManager;
 
-    // Metoda pentru înregistrarea unui utilizator nou.
     public AuthResponse register(RegisterRequest registerRequest) {
-        // Construiește un obiect User folosind datele din cererea de înregistrare.
-        var user = User.builder()
-                .name(registerRequest.getName()) // Setează numele.
-                .email(registerRequest.getEmail()) // Setează email-ul.
-                .username(registerRequest.getUsername()) // Setează username-ul.
-                .password(passwordEncoder.encode(registerRequest.getPassword())) // Criptează și setează parola.
-                .type(TypeUser.USER) // Setează tipul utilizatorului (implicit USER).
-                .build();
-
-        // Salvează utilizatorul în baza de date.
+        var user = User.builder().name(registerRequest.getName()).email(registerRequest.getEmail()).username(registerRequest.getUsername()).password(passwordEncoder.encode(registerRequest.getPassword())).type(TypeUser.ADMIN).build();
         User savedUser = userRepository.save(user);
-
-        // Generează un access token JWT pentru utilizatorul salvat.
         var accessToken = jwtService.generateToken(savedUser);
-
-        // Creează un refresh token pentru utilizator.
         var refreshToken = refreshTokenService.createRefreshToken(savedUser.getEmail());
-
-        // Returnează un obiect AuthResponse care conține token-urile și detaliile utilizatorului.
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken.getRefreshToken())
-                .name(savedUser.getName())
-                .email(savedUser.getEmail())
-                .build();
+        return AuthResponse.builder().accessToken(accessToken).refreshToken(refreshToken.getRefreshToken()).name(savedUser.getName()).email(savedUser.getEmail()).build();
     }
 
-    // Metoda pentru autentificarea unui utilizator.
     public AuthResponse login(LoginRequest loginRequest) {
-        // Autentifică utilizatorul folosind AuthenticationManager.
-        // Dacă autentificarea eșuează, se va arunca o excepție.
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(), // Folosește email-ul ca principal.
-                        loginRequest.getPassword() // Parola.
-                )
-        );
-
-        // Caută utilizatorul în baza de date după email.
-        var user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found!")); // Aruncă excepție dacă nu e găsit.
-
-        // Generează un access token JWT.
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+        var user = userRepository.findByEmail(loginRequest.getEmail()).orElseThrow(() -> new UsernameNotFoundException("User not found!"));
         var accessToken = jwtService.generateToken(user);
-
-        // Creează (sau returnează unul existent) un refresh token.
         var refreshToken = refreshTokenService.createRefreshToken(loginRequest.getEmail());
+        return AuthResponse.builder().accessToken(accessToken).refreshToken(refreshToken.getRefreshToken()).name(user.getName()).email(user.getEmail()).build();
+    }
+}
 
-        // Returnează răspunsul cu token-uri.
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken.getRefreshToken())
-                .name(user.getName())
-                .email(user.getEmail())
-                .build();
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/services/JwtService.java
+package com.example.robot.auth.services;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+import java.security.Key;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+@Service
+public class JwtService {
+    private static final String SECRET_KEY = "BF7FD11ACE545745B7BA1AF98B6F156D127BC7BB544BAB6A4FD74E4FC7";
+
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder().setSigningKey(getSignInKey()).build().parseClaimsJws(token).getBody();
+    }
+
+    private Key getSignInKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public String generateToken(UserDetails userDetails) {
+        return generateToken(new HashMap<>(), userDetails);
+    }
+
+    public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+        extraClaims = new HashMap<>(extraClaims);
+        extraClaims.put("role", userDetails.getAuthorities());
+        return Jwts.builder().setClaims(extraClaims).setSubject(userDetails.getUsername()).setIssuedAt(new Date(System.currentTimeMillis())).setExpiration(new Date(System.currentTimeMillis() + 25 * 100000)).signWith(getSignInKey(), SignatureAlgorithm.HS256).compact();
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    private Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/services/RefreshTokenService.java
+package com.example.robot.auth.services;
+
+import com.example.robot.auth.entities.RefreshToken;
+import com.example.robot.auth.entities.User;
+import com.example.robot.auth.repositories.RefreshTokenRepository;
+import com.example.robot.auth.repositories.UserRepository;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import java.time.Instant;
+import java.util.UUID;
+
+@Service
+public class RefreshTokenService {
+    private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    public RefreshTokenService(UserRepository userRepository, RefreshTokenRepository refreshTokenRepository) {
+        this.userRepository = userRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+    }
+
+    public RefreshToken createRefreshToken(String username) {
+        User user = userRepository.findByEmail(username).orElseThrow(() -> new UsernameNotFoundException("User not found with email : " + username));
+        RefreshToken refreshToken = user.getRefreshToken();
+        if (refreshToken == null) {
+            long refreshTokenValidity = 30 * 100000;
+            refreshToken = RefreshToken.builder().refreshToken(UUID.randomUUID().toString()).expirationTime(Instant.now().plusMillis(refreshTokenValidity)).user(user).build();
+            refreshTokenRepository.save(refreshToken);
+        }
+        return refreshToken;
+    }
+
+    public RefreshToken verifyRefreshToken(String refreshToken) {
+        RefreshToken refToken = refreshTokenRepository.findByRefreshToken(refreshToken).orElseThrow(() -> new RuntimeException("Refresh token not found!"));
+        if (refToken.getExpirationTime().compareTo(Instant.now()) < 0) {
+            refreshTokenRepository.delete(refToken);
+            throw new RuntimeException("Refresh Token expired");
+        }
+        return refToken;
     }
 }
 
@@ -528,504 +698,38 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 
-// @Service marchează clasa ca fiind un serviciu Spring.
-// OncePerRequestFilter asigură că filtrul este executat o singură dată per request.
 @Service
 public class AuthFilterService extends OncePerRequestFilter {
-
-    // Serviciul pentru manipularea JWT-urilor.
     private final JwtService jwtService;
-
-    // Serviciul pentru încărcarea detaliilor utilizatorului.
     private final UserDetailsService userDetailsService;
 
-    // Constructor pentru injectarea dependențelor.
     public AuthFilterService(JwtService jwtService, UserDetailsService userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
     }
 
-
-    // Metoda principală a filtrului, executată pentru fiecare request.
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request,
-                                    @NonNull HttpServletResponse response,
-                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
-
-        // Obține header-ul de autorizare din request.
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
         final String authHeader = request.getHeader("Authorization");
         String jwt;
         String username;
-
-        // Verifică dacă header-ul există și începe cu "Bearer ".
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            // Dacă nu, continuă cu următorul filtru din lanț fără a face nimic.
             filterChain.doFilter(request, response);
             return;
         }
-
-        // Extrage token-ul JWT din header (elimină prefixul "Bearer ").
         jwt = authHeader.substring(7);
-
-        // Extrage username-ul din token.
         username = jwtService.extractUsername(jwt);
-
-        // Dacă username-ul există și utilizatorul nu este deja autentificat în contextul de securitate.
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // Încarcă detaliile utilizatorului din baza de date.
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            // Verifică dacă token-ul este valid pentru utilizatorul respectiv.
-            if(jwtService.isTokenValid(jwt, userDetails)) {
-                // Creează un obiect de autentificare.
-                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-
-                // Setează detaliile autentificării (ex: adresa IP).
-                authenticationToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-
-                // Setează autentificarea în contextul de securitate Spring.
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             }
         }
-
-        // Continuă cu următorul filtru din lanț.
         filterChain.doFilter(request, response);
-    }
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/services/RefreshTokenService.java
-package com.example.robot.auth.services;
-import com.example.robot.auth.entities.RefreshToken;
-import com.example.robot.auth.entities.User;
-import com.example.robot.auth.repositories.RefreshTokenRepository;
-import com.example.robot.auth.repositories.UserRepository;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Service;
-
-import java.time.Instant;
-import java.util.UUID;
-
-
-// @Service marchează clasa ca fiind un serviciu Spring.
-@Service
-public class RefreshTokenService {
-
-    // Repository pentru accesul la datele utilizatorilor.
-    private final UserRepository userRepository;
-
-    // Repository pentru accesul la datele refresh token-urilor.
-    private final RefreshTokenRepository refreshTokenRepository;
-
-    // Constructor pentru injectarea dependențelor.
-    public RefreshTokenService(UserRepository userRepository, RefreshTokenRepository refreshTokenRepository) {
-        this.userRepository = userRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-    }
-
-    // Creează un nou refresh token pentru un utilizator.
-    public RefreshToken createRefreshToken(String username) {
-        // Caută utilizatorul după email (care este folosit ca username).
-        User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email : " + username));
-
-        // Verifică dacă utilizatorul are deja un refresh token asociat.
-        RefreshToken refreshToken = user.getRefreshToken();
-
-        // Dacă nu există un refresh token, se creează unul nou.
-        if (refreshToken == null) {
-            // Setează durata de valabilitate a token-ului.
-            long refreshTokenValidity = 30 * 100000;
-            // Construiește un nou obiect RefreshToken.
-            refreshToken = RefreshToken.builder()
-                    .refreshToken(UUID.randomUUID().toString()) // Generează un token unic.
-                    .expirationTime(Instant.now().plusMillis(refreshTokenValidity)) // Setează timpul de expirare.
-                    .user(user) // Asociază token-ul cu utilizatorul.
-                    .build();
-
-            // Salvează noul token în baza de date.
-            refreshTokenRepository.save(refreshToken);
-        }
-
-        // Returnează token-ul (fie cel nou creat, fie cel existent).
-        return refreshToken;
-    }
-
-    // Verifică validitatea unui refresh token.
-    public RefreshToken verifyRefreshToken(String refreshToken) {
-        // Caută token-ul în baza de date după valoarea sa.
-        RefreshToken refToken = refreshTokenRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("Refresh token not found!"));
-
-        // Verifică dacă token-ul a expirat.
-        if (refToken.getExpirationTime().compareTo(Instant.now()) < 0) {
-            // Dacă a expirat, îl șterge din baza de date.
-            refreshTokenRepository.delete(refToken);
-            // Aruncă o excepție pentru a informa clientul.
-            throw new RuntimeException("Refresh Token expired");
-        }
-
-        // Dacă token-ul este valid, îl returnează.
-        return refToken;
-    }
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/dto/AlertDTO.java
-package com.example.robot.dto;
-
-import lombok.Data;
-
-@Data
-public class AlertDTO {
-    private String alertType;
-    private String message;
-    private String imageBase64;
-    private String timestamp;
-    private String status;
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/model/Alert.java
-package com.example.robot.model;
-
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-
-@Entity
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
-@Data
-@Table(name = "security_alert")
-public class Alert {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    private String alertType;
-
-    @Column(length = 500)
-    private String message;
-
-    private LocalDateTime timestamp;
-
-    @Lob
-    @Column(columnDefinition = "LONGTEXT")
-    private String snapshotBase64;
-
-    private String status;
-
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/service/AlertService.java
-package com.example.robot.service;
-
-import com.example.robot.dto.AlertDTO;
-import com.example.robot.model.Alert;
-import com.example.robot.repository.AlertRepository;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-
-@Service
-public class AlertService {
-    private final AlertRepository alertRepository;
-    private final SimpMessagingTemplate simpMessagingTemplate;
-
-    public AlertService(AlertRepository alertRepository, SimpMessagingTemplate simpMessagingTemplate) {
-        this.alertRepository = alertRepository;
-        this.simpMessagingTemplate = simpMessagingTemplate;
-    }
-    public void processAlertFromRobot(AlertDTO dto) {
-
-        Alert alert = new Alert();
-
-        alert.setAlertType(dto.getAlertType());
-        alert.setMessage(dto.getMessage());
-        alert.setSnapshotBase64(dto.getImageBase64());
-
-        // 2. Gestionare Status (Default: NEW)
-        if (dto.getStatus() != null && !dto.getStatus().isEmpty()) {
-            alert.setStatus(dto.getStatus().toUpperCase());
-        } else {
-            alert.setStatus("NEW");
-        }
-
-        // 3. Gestionare Timp (De la Robot sau Acum)
-        if (dto.getTimestamp() != null && !dto.getTimestamp().isEmpty()) {
-            try {
-                alert.setTimestamp(LocalDateTime.parse(dto.getTimestamp()));
-            } catch (Exception e) {
-                alert.setTimestamp(LocalDateTime.now()); // Fallback dacă formatul e greșit
-            }
-        } else {
-            alert.setTimestamp(LocalDateTime.now());
-        }
-
-        saveAndBroadcast(alert);
-    }
-
-    /**
-     * Metodă internă pentru a crea alerte generate de server (ex: Baterie Critică)
-     */
-    public void createInternalAlert(String type, String message) {
-        Alert alert = Alert.builder()
-                .alertType(type)
-                .message(message)
-                .status("NEW")
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        saveAndBroadcast(alert);
-    }
-
-    // Metodă ajutătoare pentru a nu repeta codul de salvare
-    private void saveAndBroadcast(Alert alert) {
-        // Salvare în MySQL
-        Alert savedAlert = alertRepository.save(alert);
-
-        // Trimitere Live pe WebSocket (către Dashboard)
-        simpMessagingTemplate.convertAndSend("/topic/alerts", savedAlert);
-
-        System.out.println("🚨 ALERTA SALVATĂ: " + alert.getAlertType() + " - " + alert.getMessage());
-    }
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/controller/RobotController.java
-package com.example.robot.controller;
-
-import com.example.robot.dto.AlertDTO;
-import com.example.robot.dto.RobotStatusDTO;
-import com.example.robot.service.AlertService;
-import com.example.robot.service.RobotService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-
-@RestController
-@RequestMapping("/api/robot")
-@CrossOrigin(origins = "*")
-public class RobotController {
-
-    private final RobotService robotService;
-    private final AlertService alertService;
-
-    public RobotController(RobotService robotService, AlertService alertService) {
-        this.robotService = robotService;
-        this.alertService = alertService;
-    }
-
-    @PostMapping("/telemetry")
-    public ResponseEntity<String> reciveTelemetry(@RequestBody RobotStatusDTO dto){
-        robotService.processTelemetry(dto);
-        return ResponseEntity.ok("UPDATE!");
-    }
-    @PostMapping("/alert")
-    public ResponseEntity<String> reciveAlert(@RequestBody AlertDTO dto) {
-        alertService.processAlertFromRobot(dto);
-        return ResponseEntity.ok("Alert saved!");
-    }
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/repository/AlertRepository.java
-package com.example.robot.repository;
-
-import com.example.robot.model.Alert;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.List;
-
-public interface AlertRepository extends JpaRepository<Alert, Long> {
-    List<Alert> findByStatus(String status);
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/repository/RobotRepository.java
-package com.example.robot.repository;
-
-import com.example.robot.model.Robot;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.Optional;
-
-public interface RobotRepository extends JpaRepository<Robot, Long> {
-    Optional<Robot>findTopByOrderByTimestampDesc();
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/repositories/UserRepository.java
-package com.example.robot.auth.repositories;
-import com.example.robot.auth.entities.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.Optional;
-
-public interface UserRepository extends JpaRepository<User, Integer> {
-    Optional<User> findByEmail(String username);
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/repositories/RefreshTokenRepository.java
-package com.example.robot.auth.repositories;
-
-import com.example.robot.auth.entities.RefreshToken;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.Optional;
-
-public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Integer> {
-    Optional<RefreshToken> findByRefreshToken(String refreshToken);
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/config/WebSocketConfig.java
-package com.example.robot.config;
-
-import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
-import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
-
-@Configuration
-@EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-
-    @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Aici se conectează browserul
-        registry.addEndpoint("/ws-robot").setAllowedOriginPatterns("*").withSockJS();
-    }
-
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // Topic-urile pe care le ascultă browserul
-        registry.enableSimpleBroker("/topic");
-        registry.setApplicationDestinationPrefixes("/app");
-    }
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/config/ApplicationConfig.java
-package com.example.robot.auth.config;
-
-import com.example.robot.auth.repositories.UserRepository;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-
-// @Configuration indică faptul că această clasă conține definiții de bean-uri Spring.
-@Configuration
-public class ApplicationConfig {
-
-    private final UserRepository userRepository;
-
-    // Constructor pentru injectarea repository-ului de utilizatori.
-    public ApplicationConfig(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-
-    // Definește un bean pentru UserDetailsService.
-    // Acesta este folosit de Spring Security pentru a încărca datele utilizatorului în timpul autentificării.
-    @Bean
-    public UserDetailsService userDetailsService() {
-        // Implementare funcțională: caută utilizatorul după email.
-        // Dacă nu este găsit, aruncă o excepție UsernameNotFoundException.
-        return username -> userRepository.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
-    }
-
-    // Definește un bean pentru AuthenticationProvider.
-    // Acesta este responsabil pentru logica de autentificare (verificarea credențialelor).
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
-        // Folosim DaoAuthenticationProvider, care este implementarea standard ce folosește un UserDetailsService și un PasswordEncoder.
-        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setUserDetailsService(userDetailsService()); // Setează serviciul de încărcare a utilizatorilor.
-        authenticationProvider.setPasswordEncoder(passwordEncoder()); // Setează encoder-ul pentru verificarea parolelor.
-        return authenticationProvider;
-    }
-
-    // Definește un bean pentru AuthenticationManager.
-    // Acesta este punctul central de intrare pentru autentificare în Spring Security.
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        // Obține AuthenticationManager din configurația Spring Security.
-        return config.getAuthenticationManager();
-    }
-
-    // Definește un bean pentru PasswordEncoder.
-    // Acesta este folosit pentru a cripta parolele la înregistrare și pentru a le verifica la login.
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        // Folosim BCrypt, un algoritm de hashing puternic și standard în industrie.
-        return new BCryptPasswordEncoder();
-    }
-
-}
-
-// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/config/SecurityConfiguration.java
-package com.example.robot.auth.config;
-
-import com.example.robot.auth.services.AuthFilterService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
-@Configuration
-@EnableWebSecurity
-@EnableMethodSecurity
-@RequiredArgsConstructor
-public class SecurityConfiguration {
-
-    private final AuthFilterService authFilterService;
-    private final AuthenticationProvider authenticationProvider;
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(req -> req
-                        // Rute Publice
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/robot/**").permitAll()
-                        .requestMatchers("/ws-robot/**").permitAll()
-
-                        // Rute de Admin - NECESITĂ ROL DE ADMIN
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-
-                        // Orice altceva necesită doar Autentificare
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider)
-                .addFilterBefore(authFilterService, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
     }
 }
 
@@ -1042,15 +746,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class AuthResponse {
-
     private String accessToken;
-
     private String refreshToken;
-
     private String name;
-
     private String email;
-
 }
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/utils/LoginRequest.java
@@ -1087,7 +786,6 @@ public class RegisterRequest {
     private String username;
     private String email;
     private String password;
-
 }
 
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/utils/RefreshTokenRequest.java
@@ -1100,6 +798,143 @@ public class RefreshTokenRequest {
     private String refreshToken;
 }
 
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/config/ApplicationConfig.java
+package com.example.robot.auth.config;
+
+import com.example.robot.auth.repositories.UserRepository;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration
+public class ApplicationConfig {
+    private final UserRepository userRepository;
+
+    public ApplicationConfig(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> userRepository.findByEmail(username).orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
+        authenticationProvider.setUserDetailsService(userDetailsService());
+        authenticationProvider.setPasswordEncoder(passwordEncoder());
+        return authenticationProvider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/config/SecurityConfiguration.java
+package com.example.robot.auth.config;
+
+import com.example.robot.auth.services.AuthFilterService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
+public class SecurityConfiguration {
+    private final AuthFilterService authFilterService;
+    private final AuthenticationProvider authenticationProvider;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable).cors(Customizer.withDefaults()).authorizeHttpRequests(req -> req.requestMatchers("/api/v1/auth/**").permitAll().requestMatchers("/ws-robot/**").permitAll().requestMatchers("/api/robot/telemetry").permitAll().requestMatchers("/api/robot/alert").permitAll().requestMatchers("/api/admin/**").hasAuthority("ADMIN").anyRequest().authenticated()).sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authenticationProvider(authenticationProvider).addFilterBefore(authFilterService, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+}
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/auth/config/CorsConfig.java
+package com.example.robot.auth.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
+import java.util.Collections;
+
+@Configuration
+public class CorsConfig {
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Collections.singletonList("http://localhost:*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}
+
+// =================================================================================
+// PACHET: com.example.robot.config
+// =================================================================================
+
+// File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/config/WebSocketConfig.java
+package com.example.robot.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
+import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws-robot").setAllowedOriginPatterns("*").withSockJS();
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+        registry.enableSimpleBroker("/topic");
+        registry.setApplicationDestinationPrefixes("/app");
+    }
+}
+
+// =================================================================================
+// PACHET: com.example.robot
+// =================================================================================
+
 // File: /Users/arisradoi/Desktop/turtlebot/robot-security-dashboard/src/main/java/com/example/robot/RobotSecurityDashboardApplication.java
 package com.example.robot;
 
@@ -1108,9 +943,116 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class RobotSecurityDashboardApplication {
-
     public static void main(String[] args) {
         SpringApplication.run(RobotSecurityDashboardApplication.class, args);
     }
-
 }
+
+// =================================================================================
+// FIȘIER: pom.xml
+// =================================================================================
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.3</version>
+        <relativePath/>
+    </parent>
+    <groupId>com.proiect</groupId>
+    <artifactId>robot-security</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>robot-security</name>
+    <description>Backend pentru Robot ROS2</description>
+    <properties>
+        <java.version>17</java.version>
+        <jjwt.version>0.11.5</jjwt.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+// =================================================================================
+// FIȘIER: application.properties
+// =================================================================================
+
+spring.application.name=robot-security
+spring.datasource.url=jdbc:mysql://localhost:3306/db_robot_security?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=Root1234
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+server.port=8080
