@@ -1,70 +1,80 @@
-# Getting Started with Create React App
+# Robot Security Dashboard - Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A real-time monitoring and control interface built with **React** for a TurtleBot-based security system. This application provides a live bridge between the robot's hardware telemetry and the end-user, featuring secure authentication and administrative controls.
 
-## Available Scripts
 
-In the project directory, you can run:
 
-### `npm start`
+## 🚀 Key Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+* **Real-time Telemetry:** Live updates for robot status, battery level, and spatial coordinates $(X, Y)$ using WebSockets (STOMP over SockJS).
+* **Live Incident Alerts:** Immediate notification stream for security alerts, including Base64-rendered snapshots captured by the robot.
+* **Hybrid Data Sourcing:** * **Live:** WebSocket connection for "hot" data.
+    * **Historical:** REST API integration to fetch the last known state and alert history from the database upon login.
+* **Role-Based Access Control (RBAC):**
+    * **USER:** View-only access to telemetry and alerts.
+    * **ADMIN:** Access to the **Command Control Panel** (Start, Stop, Dock).
+* **JWT Security:** Secure authentication flow with token decoding to determine user permissions.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🛠️ Tech Stack
 
-### `npm test`
+* **Core:** React (Vite)
+* **Communication:** * **Axios:** For RESTful API calls with interceptors for automatic JWT injection.
+    * **SockJS & StompJS:** For full-duplex WebSocket communication.
+* **Security:** `jwt-decode` for client-side role verification.
+* **Routing:** React Router v6.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 📋 Prerequisites
 
-### `npm run build`
+Before running the dashboard, ensure you have:
+* [Node.js](https://nodejs.org/) (v16.x or newer)
+* A running instance of the **Spring Boot Backend** (configured for port `8080`).
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## ⚙️ Installation & Setup
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/your-username/robot-dashboard.git](https://github.com/your-username/robot-dashboard.git)
+    cd robot-dashboard
+    ```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-### `npm run eject`
+3.  **Configure API URL:**
+    Check `src/services/api.js` to ensure the `API_URL` matches your backend:
+    ```javascript
+    const API_URL = 'http://localhost:8080/api';
+    ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+4.  **Start the development server:**
+    ```bash
+    npm run dev
+    ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 🔌 API & Connection Map
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+| Type | Path | Purpose |
+| :--- | :--- | :--- |
+| **REST (POST)** | `/v1/auth/login` | User authentication |
+| **REST (GET)** | `/robot/latest-telemetry` | Fetch last state from DB |
+| **REST (POST)** | `/admin/{command}` | Admin-only robot triggers |
+| **WS Connection** | `/ws-robot` | Handshake for WebSockets |
+| **WS Topic** | `/topic/telemetry` | Incoming live robot data |
+| **WS Topic** | `/topic/alerts` | Incoming security alerts |
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
-## Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 📂 Project Structure
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+* `src/pages/Dashboard.jsx`: The main hub managing WebSocket lifecycles and historical data fetches.
+* `src/services/api.js`: Centralized Axios config with request interceptors for the `Authorization: Bearer <token>` header.
+* `src/main.jsx`: Includes global polyfills required for `stompjs` compatibility in modern browser environments.
 
-### Code Splitting
+## 🛡️ Security Implementation Note
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+The frontend uses a secure request interceptor. Once a user logs in, the `accessToken` is stored in `localStorage`. Every subsequent request automatically carries the JWT in the headers, ensuring the backend can validate the user's identity and role for every action.
 
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+---
+*Created as part of the TurtleBot Security System Integration.*
