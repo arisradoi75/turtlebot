@@ -4,7 +4,7 @@ A real-time monitoring and control interface built with **React** for a TurtleBo
 
 
 
-## 🚀 Key Features
+## Key Features
 
 * **Real-time Telemetry:** Live updates for robot status, battery level, and spatial coordinates $(X, Y)$ using WebSockets (STOMP over SockJS).
 * **Live Incident Alerts:** Immediate notification stream for security alerts, including Base64-rendered snapshots captured by the robot.
@@ -15,7 +15,7 @@ A real-time monitoring and control interface built with **React** for a TurtleBo
     * **ADMIN:** Access to the **Command Control Panel** (Start, Stop, Dock).
 * **JWT Security:** Secure authentication flow with token decoding to determine user permissions.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 * **Core:** React (Vite)
 * **Communication:** * **Axios:** For RESTful API calls with interceptors for automatic JWT injection.
@@ -23,13 +23,13 @@ A real-time monitoring and control interface built with **React** for a TurtleBo
 * **Security:** `jwt-decode` for client-side role verification.
 * **Routing:** React Router v6.
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before running the dashboard, ensure you have:
 * [Node.js](https://nodejs.org/) (v16.x or newer)
 * A running instance of the **Spring Boot Backend** (configured for port `8080`).
 
-## ⚙️ Installation & Setup
+## Installation & Setup
 
 1.  **Clone the repository:**
     ```bash
@@ -53,7 +53,7 @@ Before running the dashboard, ensure you have:
     npm run dev
     ```
 
-## 🔌 API & Connection Map
+## API & Connection Map
 
 | Type | Path | Purpose |
 | :--- | :--- | :--- |
@@ -66,13 +66,13 @@ Before running the dashboard, ensure you have:
 
 
 
-## 📂 Project Structure
+## Project Structure
 
 * `src/pages/Dashboard.jsx`: The main hub managing WebSocket lifecycles and historical data fetches.
 * `src/services/api.js`: Centralized Axios config with request interceptors for the `Authorization: Bearer <token>` header.
 * `src/main.jsx`: Includes global polyfills required for `stompjs` compatibility in modern browser environments.
 
-## 🛡️ Security Implementation Note
+## Security Implementation Note
 
 The frontend uses a secure request interceptor. Once a user logs in, the `accessToken` is stored in `localStorage`. Every subsequent request automatically carries the JWT in the headers, ensuring the backend can validate the user's identity and role for every action.
 
