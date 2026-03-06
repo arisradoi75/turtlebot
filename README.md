@@ -1,4 +1,4 @@
-# 🛡️ TurtleBot Security System
+#  TurtleBot Security System
 
 An automated IoT security system based on **ROS2** and a **Full-Stack Web** architecture. 
 
@@ -6,22 +6,20 @@ The project integrates a virtual TurtleBot (simulated in a Gazebo environment - 
 
 ---
 
-## 🎥 Demo Video
+##  Demo Video
 See the robot in action and the system's functionality here:
-👉 **[Watch the demonstration on YouTube](PUT_YOUTUBE_LINK_HERE)**
+ **[Watch the demonstration on YouTube](PUT_YOUTUBE_LINK_HERE)**
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
+
 
 
 The project is divided into three major components communicating via a virtual private network (**Tailscale**), allowing remote development and operation (MacBook <-> Linux).
 
 1. **🤖 Robot Component (ROS2 & Gazebo) - Running on Linux**
    * Handles navigation, mapping (SLAM), and the physical simulation of the TurtleBot in the Amazon warehouse.
-   
-   ![Gazebo Amazon Warehouse Simulation](images/gzweb_aws_warehouse.jpg)
-   
    * The detection module recognizes intruders and triggers an event.
    * Communicates with the Backend via HTTP POST requests (sending telemetry and images) and exposes a Python/Flask server to receive commands (Start, Stop, Dock).
 
@@ -39,7 +37,7 @@ The project is divided into three major components communicating via a virtual p
 
 ---
 
-##  Repository Structure (Branches)
+## Repository Structure (Branches)
 
 For efficient organization and parallel development, the source code has been separated into multiple branches:
 
@@ -50,7 +48,7 @@ For efficient organization and parallel development, the source code has been se
 
 ---
 
-##  Detailed Documentation
+## Detailed Documentation
 
 The comprehensive technical documentation is divided into two major sections, detailing the work of each team member:
 
