@@ -42,9 +42,9 @@ The project is divided into three major components communicating via a virtual p
 For efficient organization and parallel development, the source code has been separated into multiple branches:
 
 * `main` ➔ The current branch; contains the centralized project documentation.
-* `radu` ➔ Source code for the Robotics part (ROS2, Gazebo, detection and control scripts).
-* `ardev` ➔ Source code for the Backend (Spring Boot, Security, WebSockets).
-* `arfront` ➔ Source code for the Frontend (React.js, web interface).
+* `gaz+ros2` ➔ Source code for the Robotics part (ROS2, Gazebo, detection and control scripts).
+* `back-end` ➔ Source code for the Backend (Spring Boot, Security, WebSockets).
+* `front-end` ➔ Source code for the Frontend (React.js, web interface).
 
 ---
 
