@@ -18,12 +18,12 @@ See the robot in action and the system's functionality here:
 
 The project is divided into three major components communicating via a virtual private network (**Tailscale**), allowing remote development and operation (MacBook <-> Linux).
 
-1. **🤖 Robot Component (ROS2 & Gazebo) - Running on Linux**
+1. ** Robot Component (ROS2 & Gazebo) - Running on Linux**
    * Handles navigation, mapping (SLAM), and the physical simulation of the TurtleBot in the Amazon warehouse.
    * The detection module recognizes intruders and triggers an event.
    * Communicates with the Backend via HTTP POST requests (sending telemetry and images) and exposes a Python/Flask server to receive commands (Start, Stop, Dock).
 
-2. **⚙️ Backend Component (Spring Boot & Java 17) - Running on macOS**
+2. ** Backend Component (Spring Boot & Java 17) - Running on macOS**
    * The central server routing the information.
    * Handles user authentication and authorization (JWT, Spring Security).
    * Saves telemetry history and alerts in the MySQL database.
