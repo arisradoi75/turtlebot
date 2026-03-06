@@ -5,7 +5,7 @@ from std_msgs.msg import Bool, Int32
 import json
 from datetime import datetime
 import requests
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import time
 from flask import Flask, jsonify, request
@@ -22,16 +22,23 @@ class PatrolMonitor(Node):
             10
         )
         self.battery_pub = self.create_publisher(Int32, '/battery_level', 10)
+        # self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
     def alert_callback(self, msg):
-        if msg.data:
+        if msg.data and not self.intruder_detected:
             self.intruder_detected = True
-            self.get_logger().warn("INTRUDER DETECTED! Stopping patrol.")
+            self.get_logger().warn("INTRUDER DETECTED!")
 
     def publish_battery(self, level):
         msg = Int32()
         msg.data = int(level)
         self.battery_pub.publish(msg)
+
+    # def publish_velocity(self, linear, angular):
+    #     msg = Twist()
+    #     msg.linear.x = float(linear)
+    #     msg.angular.z = float(angular)
+    #     # self.cmd_vel_pub.publish(msg)
 
 # Global variables for rate limiting
 last_telemetry_time = 0.0
@@ -54,7 +61,7 @@ def update_status_file(status, x, y, battery_level=100):
     if status != last_sent_status or (current_time - last_telemetry_time) > 2.0:
         try:
             # TODO: Replace 192.168.1.X with your Spring Boot computer's actual IP
-            url = "http://172.20.10.2:8080/api/robot/telemetry"
+            url = "http://100.90.57.82:8080/api/robot/telemetry"
             headers = {'Content-Type': 'application/json'}
             requests.post(url, json=data, headers=headers, timeout=0.5)
             
@@ -74,7 +81,7 @@ def send_battery_alert(battery_level):
         "status": "ALERT"
     }
     try:
-        url = "http://172.20.10.2:8080/api/robot/alert"
+        url = "http://100.90.57.82:8080/api/robot/alert"
         headers = {'Content-Type': 'application/json'}
         requests.post(url, json=alert_data, headers=headers, timeout=0.5)
     except requests.exceptions.RequestException as e:
@@ -105,10 +112,12 @@ class PatrolManager:
         if self.charging:
             self.charging = False
             self.navigator.cancelTask()
-            
+        
+        use_cooldown = self.monitor.intruder_detected
+
         self.patrolling = True
         self.monitor.intruder_detected = False  # Reset intruder flag
-        self.thread = threading.Thread(target=self.run)
+        self.thread = threading.Thread(target=self.run, args=(use_cooldown,))
         self.thread.start()
         return True
 
@@ -178,7 +187,11 @@ class PatrolManager:
             
             self.charging = False
 
-    def run(self):
+    def run(self, cooldown=False):
+        if cooldown:
+            print("Alert Cooldown: Waiting 10 seconds before resuming patrol...")
+            time.sleep(10)
+
         self.monitor.publish_battery(self.battery_level)
         
         while rclpy.ok() and self.patrolling:
@@ -204,9 +217,11 @@ class PatrolManager:
                 # Check for intruder
                 rclpy.spin_once(self.monitor, timeout_sec=0.1)
                 if self.monitor.intruder_detected:
+                    self.monitor.get_logger().warn("Intruder detected! Pausing patrol for 5 seconds.")
                     update_status_file("ALERT", self.last_x, self.last_y, self.battery_level)
-                    self.patrolling = False
-                    break
+                    time.sleep(5)
+                    self.monitor.intruder_detected = False  # Reset alert
+                    # Proceed to the current waypoint
                 
                 # Create goal pose
                 goal = PoseStamped()
@@ -248,9 +263,13 @@ class PatrolManager:
                     rclpy.spin_once(self.monitor, timeout_sec=0.1)
                     if self.monitor.intruder_detected:
                         self.navigator.cancelTask()
+                        self.monitor.get_logger().warn("Intruder detected! Pausing patrol for 5 seconds.")
                         update_status_file("ALERT", self.last_x, self.last_y, self.battery_level)
-                        self.patrolling = False
-                        break
+                        time.sleep(5)
+                        self.monitor.intruder_detected = False # Reset alert
+                        # Resume the current task
+                        self.navigator.goToPose(goal)
+                        continue
                 
                 if not self.patrolling:
                     break
@@ -296,7 +315,39 @@ def handle_command():
         return stop_patrol()
     elif 'dock' in command:
         return dock_robot()
+    # elif command in ['w', 'a', 's', 'd']:
+    #     return manual_control(command)
     return jsonify({"status": "Invalid command", "received": data}), 400
+
+# @app.route('/api/admin/jog/<direction>', methods=['POST'])
+# def manual_control(direction):
+#     command = str(direction).lower()
+#     
+#     if patrol_manager and patrol_manager.charging:
+#         return jsonify({"status": "Ignored: Robot is charging"}), 409
+# 
+#     # If admin takes control, stop the patrol immediately
+#     if patrol_manager and patrol_manager.patrolling:
+#         patrol_manager.stop()
+# 
+#     linear = 0.0
+#     angular = 0.0
+#     
+#     if command == 'w':
+#         linear = 0.2
+#     elif command == 's':
+#         linear = -0.2
+#     elif command == 'a':
+#         angular = 0.5
+#     elif command == 'd':
+#         angular = -0.5
+#     elif command == 'stop':
+#         pass
+# 
+#     if patrol_manager and patrol_manager.monitor:
+#         patrol_manager.monitor.publish_velocity(linear, angular)
+#         return jsonify({"status": "Command executed", "linear": linear, "angular": angular}), 200
+#     return jsonify({"status": "Error: Monitor not initialized"}), 500
 
 def main(args=None):
     global patrol_manager
@@ -312,9 +363,9 @@ def main(args=None):
     # Coordinates provided
     waypoints_coords = [
         (-3.6, 9.0),
-        (-3.5, -9.5),
-        (1.8, -9.6),
-        (1.8, 7.4)
+        (-3.67, -9.33),
+        (1.73, -9.43),
+        (1.71, 6.43)
     ]
     patrol_manager = PatrolManager(navigator, monitor, waypoints_coords)
     
@@ -329,11 +380,13 @@ def main(args=None):
     flask_thread.daemon = True
     flask_thread.start()
     
-    print(f"Patrol Node Started. \nListening for commands on: http://172.20.10.12:5000\nSending telemetry to: http://172.20.10.2:8080 (Check this IP!)")
+    print(f"Patrol Node Started. \nListening for commands on: http://172.20.10.12:5000\nSending telemetry to: http://100.90.57.82:8080 (Check this IP!)")
     
     try:
         while rclpy.ok():
-            time.sleep(1)
+            if not patrol_manager.patrolling and not patrol_manager.charging:
+                rclpy.spin_once(monitor, timeout_sec=0.1)
+            time.sleep(0.1)
     except KeyboardInterrupt:
         pass
 
