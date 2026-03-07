@@ -1,4 +1,4 @@
-# 🛡️ TurtleBot Security Monitoring System
+# TurtleBot Security Monitoring System
 
 ### Full-Stack Web Platform for Robot Monitoring and Control
 
@@ -7,7 +7,7 @@ The system combines **Spring Boot, React, WebSockets, and ROS2 integration** to 
 
 ---
 
-# 📦 Project Architecture
+# Project Architecture
 
 The system follows a **modern layered full-stack architecture** that ensures:
 
@@ -30,7 +30,7 @@ React Frontend Dashboard
 
 ---
 
-# ⚙️ Technology Stack
+# Technology Stack
 
 ## Backend
 
@@ -59,7 +59,7 @@ React Frontend Dashboard
 
 ---
 
-# 🏗 Backend Architecture
+# Backend Architecture
 
 The backend follows a **layered MVC / REST architecture** to ensure clear separation of responsibilities.
 
@@ -159,7 +159,7 @@ Benefits:
 
 ---
 
-# 🔐 Authentication Module
+# Authentication Module
 
 All authentication logic is isolated inside a dedicated:
 
@@ -235,7 +235,7 @@ Manages **persistent sessions** to avoid repeated logins.
 
 ---
 
-# 🗄 Database Architecture
+# Database Architecture
 
 Database:
 
@@ -320,7 +320,7 @@ Base64 encoded LONGTEXT
 
 ---
 
-# 👤 Application Workflows
+# Application Workflows
 
 The application uses **Role-Based Access Control (RBAC)**.
 
@@ -333,9 +333,9 @@ ADMIN
 
 ---
 
-# 📝 Account Registration Flow
+# Account Registration Flow
 
-1️⃣ User enters:
+1️ User enters:
 
 * name
 * username
@@ -344,7 +344,7 @@ ADMIN
 
 ---
 
-2️⃣ React sends request:
+2️ React sends request:
 
 ```
 POST /v1/auth/register
@@ -352,7 +352,7 @@ POST /v1/auth/register
 
 ---
 
-3️⃣ Backend processing
+3️ Backend processing
 
 `AuthService`:
 
@@ -362,7 +362,7 @@ POST /v1/auth/register
 
 ---
 
-4️⃣ Completion
+4️ Completion
 
 Backend returns:
 
@@ -375,7 +375,7 @@ User is redirected to the **login page**.
 
 ---
 
-# 👁 Standard User Flow (Passive Monitoring)
+#  Standard User Flow (Passive Monitoring)
 
 Role:
 
@@ -482,7 +482,7 @@ Spring Security returns:
 
 ---
 
-# 👨‍💻 Administrator Flow (Active Control)
+#  Administrator Flow (Active Control)
 
 Role:
 
@@ -568,7 +568,7 @@ The **TurtleBot simulation in Gazebo**:
 
 ---
 
-# 🔄 Real-Time Data Flow
+#  Real-Time Data Flow
 
 To minimize latency, the system uses a **publish-subscribe model** instead of HTTP polling.
 
