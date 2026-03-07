@@ -1,4 +1,4 @@
-#  TurtleBot Security System
+# TurtleBot Security System
 
 An automated IoT security system based on **ROS2** and a **Full-Stack Web** architecture. 
 
@@ -6,30 +6,28 @@ The project integrates a virtual TurtleBot (simulated in a Gazebo environment - 
 
 ---
 
-##  Demo Video
+## Demo Video
 See the robot in action and the system's functionality here:
- **[Watch the demonstration on YouTube](PUT_YOUTUBE_LINK_HERE)**
+**[Watch the demonstration on YouTube](PUT_YOUTUBE_LINK_HERE)**
 
 ---
 
-##  System Architecture
-
-
+## System Architecture
 
 The project is divided into three major components communicating via a virtual private network (**Tailscale**), allowing remote development and operation (MacBook <-> Linux).
 
-1. ** Robot Component (ROS2 & Gazebo) - Running on Linux**
+1. **Robot Component (ROS2 & Gazebo) - Running on Linux**
    * Handles navigation, mapping (SLAM), and the physical simulation of the TurtleBot in the Amazon warehouse.
    * The detection module recognizes intruders and triggers an event.
    * Communicates with the Backend via HTTP POST requests (sending telemetry and images) and exposes a Python/Flask server to receive commands (Start, Stop, Dock).
 
-2. ** Backend Component (Spring Boot & Java 17) - Running on macOS**
+2. **Backend Component (Spring Boot & Java 17) - Running on macOS**
    * The central server routing the information.
    * Handles user authentication and authorization (JWT, Spring Security).
    * Saves telemetry history and alerts in the MySQL database.
    * Broadcasts real-time data to the Frontend via **WebSockets**.
 
-3. ** Frontend Component (React.js & Vite) - Running on macOS**
+3. **Frontend Component (React.js & Vite) - Running on macOS**
    * The User Interface (Dashboard).
    * Implements **Role-Based Access Control (RBAC)**:
      * **USER:** Can only monitor live status and alerts.
@@ -50,10 +48,10 @@ For efficient organization and parallel development, the source code has been se
 
 ## Detailed Documentation
 
-The comprehensive technical documentation is divided into two major sections, detailing the work of each team member:
+The comprehensive technical documentation is divided into two major sections, detailing the work of each team member. Both documents can be found directly in this repository as Word files (`.docx`):
 
-1.  **[Web Documentation: Frontend & Backend (Author: Aris)](Backend_Frontend_Doc.md)** * *Contains details about the database, Spring Security, JWT, WebSockets, and the React interface.*
-2.  **[Robotics Documentation: ROS2 & Gazebo (Author: Radu)](ROS2_Gazebo_Doc.md)**
+1. **Web Documentation: Frontend & Backend (Author: Aris)** * *Contains details about the database, Spring Security, JWT, WebSockets, and the React interface.*
+2. **Robotics Documentation: ROS2 & Gazebo (Author: Radu)**
    * *Contains details about the simulation, navigation, ROS2 nodes, and detection scripts.*
 
 ---
