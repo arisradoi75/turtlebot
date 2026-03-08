@@ -10,6 +10,8 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import time
 from flask import Flask, jsonify, request
 import threading
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class PatrolMonitor(Node):
     def __init__(self):
@@ -100,6 +102,7 @@ class PatrolManager:
         self.last_y = 0.0
         self.last_battery_decay_time = time.time()
         self.battery_dead = False
+        self.current_waypoint_index = 0
 
     def start(self):
         if self.battery_dead:
@@ -144,7 +147,7 @@ class PatrolManager:
         return True
 
     def run_charge(self):
-        x, y = -3.6, 9.0
+        x, y = 0.018019970506429672, 0.06712270528078079
         self.monitor.publish_battery(self.battery_level)
         
         goal = PoseStamped()
@@ -195,84 +198,86 @@ class PatrolManager:
         self.monitor.publish_battery(self.battery_level)
         
         while rclpy.ok() and self.patrolling:
-            for x, y in self.waypoints:
-                if not self.patrolling: break
+            x, y = self.waypoints[self.current_waypoint_index]
+            
+            # Battery decay logic
+            if time.time() - self.last_battery_decay_time >= 60.0:
+                self.battery_level = max(0, self.battery_level - 10)
+                self.last_battery_decay_time = time.time()
+                self.monitor.publish_battery(self.battery_level)
                 
-                # Battery decay logic
-                if time.time() - self.last_battery_decay_time >= 60.0:
-                    self.battery_level = max(0, self.battery_level - 10)
-                    self.last_battery_decay_time = time.time()
-                    self.monitor.publish_battery(self.battery_level)
+                if self.battery_level == 0:
+                    self.battery_dead = True
+                    self.stop()
+                    return
+
+                if self.battery_level < 20:
+                    send_battery_alert(self.battery_level)
+                    self.go_to_charge()
+                    return
+
+            # Check for intruder
+            rclpy.spin_once(self.monitor, timeout_sec=0.1)
+            if self.monitor.intruder_detected:
+                self.monitor.get_logger().warn("Intruder detected! Pausing patrol for 5 seconds.")
+                update_status_file("ALERT", self.last_x, self.last_y, self.battery_level)
+                time.sleep(5)
+                self.monitor.intruder_detected = False  # Reset alert
+                # Proceed to the current waypoint
+            
+            # Create goal pose
+            goal = PoseStamped()
+            goal.header.frame_id = 'map'
+            goal.header.stamp = self.navigator.get_clock().now().to_msg()
+            goal.pose.position.x = x
+            goal.pose.position.y = y
+            goal.pose.orientation.w = 1.0
+            
+            self.navigator.goToPose(goal)
+            
+            while not self.navigator.isTaskComplete():
+                if not self.patrolling:
+                    self.navigator.cancelTask()
+                    break
+                
+                feedback = self.navigator.getFeedback()
+                if feedback:
+                    pos = feedback.current_pose.pose.position
+                    self.last_x, self.last_y = pos.x, pos.y
                     
-                    if self.battery_level == 0:
-                        self.battery_dead = True
-                        self.stop()
-                        return
+                    if time.time() - self.last_battery_decay_time >= 60.0:
+                        self.battery_level = max(0, self.battery_level - 10)
+                        self.last_battery_decay_time = time.time()
+                        self.monitor.publish_battery(self.battery_level)
+                        
+                        if self.battery_level == 0:
+                            self.battery_dead = True
+                            self.stop()
+                            return
 
-                    if self.battery_level < 20:
-                        send_battery_alert(self.battery_level)
-                        self.go_to_charge()
-                        return
-
-                # Check for intruder
+                        if self.battery_level < 20:
+                            send_battery_alert(self.battery_level)
+                            self.go_to_charge()
+                            return
+                    
+                    update_status_file("PATROLLING", self.last_x, self.last_y, self.battery_level)
+                
                 rclpy.spin_once(self.monitor, timeout_sec=0.1)
                 if self.monitor.intruder_detected:
+                    self.navigator.cancelTask()
                     self.monitor.get_logger().warn("Intruder detected! Pausing patrol for 5 seconds.")
                     update_status_file("ALERT", self.last_x, self.last_y, self.battery_level)
                     time.sleep(5)
-                    self.monitor.intruder_detected = False  # Reset alert
-                    # Proceed to the current waypoint
-                
-                # Create goal pose
-                goal = PoseStamped()
-                goal.header.frame_id = 'map'
-                goal.header.stamp = self.navigator.get_clock().now().to_msg()
-                goal.pose.position.x = x
-                goal.pose.position.y = y
-                goal.pose.orientation.w = 1.0
-                
-                self.navigator.goToPose(goal)
-                
-                while not self.navigator.isTaskComplete():
-                    if not self.patrolling:
-                        self.navigator.cancelTask()
-                        break
-                    
-                    feedback = self.navigator.getFeedback()
-                    if feedback:
-                        pos = feedback.current_pose.pose.position
-                        self.last_x, self.last_y = pos.x, pos.y
-                        
-                        if time.time() - self.last_battery_decay_time >= 60.0:
-                            self.battery_level = max(0, self.battery_level - 10)
-                            self.last_battery_decay_time = time.time()
-                            self.monitor.publish_battery(self.battery_level)
-                            
-                            if self.battery_level == 0:
-                                self.battery_dead = True
-                                self.stop()
-                                return
-
-                            if self.battery_level < 20:
-                                send_battery_alert(self.battery_level)
-                                self.go_to_charge()
-                                return
-                        
-                        update_status_file("PATROLLING", self.last_x, self.last_y, self.battery_level)
-                    
-                    rclpy.spin_once(self.monitor, timeout_sec=0.1)
-                    if self.monitor.intruder_detected:
-                        self.navigator.cancelTask()
-                        self.monitor.get_logger().warn("Intruder detected! Pausing patrol for 5 seconds.")
-                        update_status_file("ALERT", self.last_x, self.last_y, self.battery_level)
-                        time.sleep(5)
-                        self.monitor.intruder_detected = False # Reset alert
-                        # Resume the current task
-                        self.navigator.goToPose(goal)
-                        continue
-                
-                if not self.patrolling:
-                    break
+                    self.monitor.intruder_detected = False # Reset alert
+                    # Resume the current task
+                    self.navigator.goToPose(goal)
+                    continue
+            
+            if not self.patrolling:
+                break
+            
+            # Move to next waypoint
+            self.current_waypoint_index = (self.current_waypoint_index + 1) % len(self.waypoints)
 
 app = Flask(__name__)
 patrol_manager = None
@@ -358,14 +363,27 @@ def main(args=None):
     
     # Initialize Nav2 BasicNavigator
     navigator = BasicNavigator()
+
+    # Load the new map: warehouse_map_noua
+    try:
+        pkg_share = get_package_share_directory('security_robot_pkg')
+        map_path = os.path.join(pkg_share, 'maps', 'warehouse_map_noua.yaml')
+        if os.path.exists(map_path):
+            print(f"Switching map to: {map_path}")
+            navigator.changeMap(map_path)
+        else:
+            print(f"Warning: Map file not found at {map_path}")
+    except Exception as e:
+        print(f"Error switching map: {e}")
+
     navigator.waitUntilNav2Active()
     
     # Coordinates provided
     waypoints_coords = [
-        (-3.6, 9.0),
-        (-3.67, -9.33),
-        (1.73, -9.43),
-        (1.71, 6.43)
+        (0.018019970506429672, 0.06712270528078079),
+        (0.07926513254642487, -18.12810516357422),
+        (4.992106914520264, -17.508106231689453),
+        (4.798624515533447, -2.3193206787109375)
     ]
     patrol_manager = PatrolManager(navigator, monitor, waypoints_coords)
     

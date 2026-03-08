@@ -1,29 +1,33 @@
-from setuptools import find_packages, setup
+import os
+from glob import glob
+from setuptools import setup
 
 package_name = 'security_robot_pkg'
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=find_packages(exclude=['test']),
+    packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='radu',
-    maintainer_email='radu.asoltanei@student.upt.ro',
-    description='TODO: Package description',
+    maintainer_email='radu@todo.todo',
+    description='Security Robot Package',
     license='TODO: License declaration',
-    extras_require={
-        'test': [
-            'pytest',
-        ],
-    },
+    tests_require=['pytest'],
     entry_points={
-        'console_scripts': ['security_node=security_robot_pkg.security_node:main',
+        'console_scripts': [
+            'security_node = security_robot_pkg.security_node:main',
+            'data_collector = security_robot_pkg.data_collector:main',
+            'patrol = security_robot_pkg.patrol:main',
+            'train_model = security_robot_pkg.train_model:main',
         ],
     },
 )
+
