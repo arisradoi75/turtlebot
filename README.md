@@ -8,7 +8,7 @@ The project integrates a virtual TurtleBot (simulated in a Gazebo environment - 
 
 ## Demo Video
 See the robot in action and the system's functionality here:
-**[Watch the demonstration on YouTube](PUT_YOUTUBE_LINK_HERE)**
+**[Watch the demonstration on YouTube](https://www.youtube.com/watch?v=NgrKTisA-4o)**
 
 ---
 
